@@ -1,0 +1,8 @@
+name: starter_auth
+description: Provider-independent session lifecycle and credential storage contract.
+version: 0.1.0
+publish_to: none
+environment:
+  sdk: ^3.6.0
+dev_dependencies:
+  test: ^1.26.0

@@ -1,0 +1,21 @@
+import '../domain/article.dart';
+import '../domain/article_repository.dart';
+
+/// Supplies the bundled sample articles for offline use.
+final class SampleArticleRepository implements ArticleRepository {
+  const SampleArticleRepository();
+
+  @override
+  Future<List<Article>> listArticles() async => const [
+    Article(
+      id: 'getting-started',
+      title: 'Getting started',
+      body: 'Replace these articles with your content.',
+    ),
+    Article(
+      id: 'about',
+      title: 'About this app',
+      body: 'This list uses local sample data.',
+    ),
+  ];
+}

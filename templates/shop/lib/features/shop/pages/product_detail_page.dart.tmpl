@@ -1,0 +1,49 @@
+import '{{material_import}}';
+
+import '../domain/product.dart';
+import 'shop_price.dart';
+
+/// Presents one product and delegates additions to the catalog's cart owner.
+class ProductDetailPage extends StatelessWidget {
+  const ProductDetailPage({
+    required this.product,
+    required this.onAdd,
+    super.key,
+  });
+
+  final Product product;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(product.name)),
+    body: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 640),
+        child: ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            Text(
+              shopPrice(product.priceCents),
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 16),
+            Text(product.description),
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: () {
+                onAdd();
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    const SnackBar(content: Text('Added to cart')),
+                  );
+              },
+              child: const Text('Add to cart'),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}

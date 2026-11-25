@@ -1,0 +1,51 @@
+import 'dart:convert';
+
+import 'package:starter_storage/starter_storage.dart';
+
+import '../domain/cart.dart';
+import 'sample_catalog.dart';
+
+/// Persists cart quantities. Restored product details come from today's catalog.
+final class CartStorage {
+  const CartStorage(this._store);
+
+  static const _key = 'shop.cart';
+  final StringStore _store;
+
+  /// Restores valid lines or returns an empty cart for unreadable snapshots.
+  Future<Cart> restore() async {
+    try {
+      final source = await _store.read(_key);
+      if (source == null) return Cart();
+      final decoded = jsonDecode(source);
+      if (decoded case {'version': 1, 'quantities': final Map quantities}) {
+        return Cart.fromLines([
+          for (final product in sampleCatalog)
+            if (quantities[product.id] case final int count
+                when count > 0 && count <= 0x7fffffff)
+              (product: product, quantity: count),
+        ]);
+      }
+    } on Exception {
+      // A stale snapshot or unavailable store must not block browsing.
+    }
+    return Cart();
+  }
+
+  /// Captures the current cart before the asynchronous write begins.
+  Future<void> save(Cart cart) async {
+    try {
+      await _store.write(
+        _key,
+        jsonEncode({
+          'version': 1,
+          'quantities': {
+            for (final line in cart.lines) line.product.id: line.quantity,
+          },
+        }),
+      );
+    } on Exception {
+      // A failed write leaves the current in-memory cart usable.
+    }
+  }
+}

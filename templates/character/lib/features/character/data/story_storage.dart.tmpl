@@ -1,0 +1,111 @@
+import 'dart:convert';
+
+import 'package:starter_database/starter_database.dart';
+import 'package:starter_storage/starter_storage.dart';
+
+import '../domain/story.dart';
+
+/// Owns the persistence contract for one character playthrough.
+abstract interface class StoryProgressRepository {
+  Future<StoryProgress?> restore(RoleStory story);
+
+  Future<void> save(StorySession session);
+}
+
+/// Stores a versioned scene path in lightweight preferences.
+final class StoryStorage implements StoryProgressRepository {
+  const StoryStorage(this._store);
+
+  final StringStore _store;
+
+  String _key(RoleStory story) => 'character.progress.${story.id}';
+
+  @override
+  Future<StoryProgress?> restore(RoleStory story) async {
+    try {
+      final source = await _store.read(_key(story));
+      if (source == null) return null;
+      return _decodeProgress(story, jsonDecode(source));
+    } on Exception {
+      // A broken save must not prevent the player from starting a story.
+    }
+    return null;
+  }
+
+  @override
+  Future<void> save(StorySession session) async {
+    try {
+      await _store.write(
+        _key(session.story),
+        jsonEncode({
+          'version': 2,
+          'scene': session.sceneId,
+          'history': session.history,
+        }),
+      );
+    } on Exception {
+      // Progress remains available in memory for the current playthrough.
+    }
+  }
+}
+
+/// Stores story progress in the optional transactional Drift snapshot table.
+final class DatabaseStoryProgressRepository implements StoryProgressRepository {
+  const DatabaseStoryProgressRepository(this._database);
+
+  final StarterDatabase _database;
+
+  String _scope(RoleStory story) => 'character.progress.${story.id}';
+
+  @override
+  Future<StoryProgress?> restore(RoleStory story) async {
+    try {
+      final snapshot = await _database.readSyncSnapshot(_scope(story));
+      if (snapshot == null) return null;
+      return _decodeProgress(story, jsonDecode(snapshot.payload));
+    } on Exception {
+      // A broken save must not prevent the player from starting a story.
+    }
+    return null;
+  }
+
+  @override
+  Future<void> save(StorySession session) => _database.writeSyncSnapshot(
+    scope: _scope(session.story),
+    payload: jsonEncode({
+      'version': 2,
+      'scene': session.sceneId,
+      'history': session.history,
+    }),
+    cursor: session.sceneId,
+    savedAt: DateTime.now().toUtc(),
+  );
+}
+
+StoryProgress? _decodeProgress(RoleStory story, Object? value) {
+  if (value case {
+    'version': 2,
+    'scene': final String scene,
+    'history': final List history,
+  }) {
+    final sceneId = story.scenes.containsKey(scene)
+        ? scene
+        : story.openingSceneId;
+    final validHistory = history
+        .whereType<String>()
+        .where(story.scenes.containsKey)
+        .toList(growable: false);
+    return StoryProgress(
+      sceneId: sceneId,
+      history: validHistory.isEmpty ? [sceneId] : validHistory,
+    );
+  }
+  if (value case {'version': 1, 'scene': final String scene}) {
+    // Migrate the original single-cursor format into a v2 path snapshot.
+    final sceneId = story.scenes.containsKey(scene)
+        ? scene
+        : story.openingSceneId;
+    return StoryProgress(sceneId: sceneId, history: [sceneId]);
+  }
+  return null;
+}

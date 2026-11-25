@@ -1,0 +1,57 @@
+name: Template smoke
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: '3.50.1'
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+      - name: Unit test the generator
+        working-directory: tooling/flutter_starter
+        run: |
+          dart pub get
+          dart analyze
+          dart test
+      - name: Generate clean, relocated projects
+        run: dart run tooling/flutter_starter/tool/template_smoke.dart --prepare "$RUNNER_TEMP/starter-smoke"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: starter-smoke
+          path: ${{ runner.temp }}/starter-smoke/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
+
+  verify:
+    needs: generate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      # This runner receives only the detached projects and the verifier.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: starter-smoke
+          path: ${{ runner.temp }}/starter-smoke
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+      - name: Resolve, analyze, test and build detached projects
+        run: dart run "$RUNNER_TEMP/starter-smoke/template_smoke.dart" --verify "$RUNNER_TEMP/starter-smoke"

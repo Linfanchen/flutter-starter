@@ -1,0 +1,101 @@
+import 'dart:async';
+
+import '{{material_import}}';
+
+import 'package:starter_storage/starter_storage.dart';
+
+import '../data/cart_storage.dart';
+import '../data/sample_catalog.dart';
+import '../domain/cart.dart';
+import 'cart_page.dart';
+import 'product_detail_page.dart';
+import 'shop_price.dart';
+
+/// Displays the catalog and owns the cart shared with product and cart pages.
+class ShopCatalogPage extends StatefulWidget {
+  const ShopCatalogPage({this.storage, super.key});
+
+  final StringStore? storage;
+
+  @override
+  State<ShopCatalogPage> createState() => _ShopCatalogPageState();
+}
+
+class _ShopCatalogPageState extends State<ShopCatalogPage> {
+  late final _cartStorage = CartStorage(
+    widget.storage ?? PreferencesStringStore(),
+  );
+  var _cart = Cart();
+  var _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_restore());
+  }
+
+  Future<void> _restore() async {
+    final cart = await _cartStorage.restore();
+    if (!mounted) return;
+    setState(() {
+      _cart = cart;
+      _loading = false;
+    });
+  }
+
+  void _onCartChanged() {
+    setState(() {});
+    unawaited(_cartStorage.save(_cart));
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('Shop'),
+      actions: [
+        TextButton(
+          onPressed: _loading
+              ? null
+              : () => Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        CartPage(cart: _cart, onCartChanged: _onCartChanged),
+                  ),
+                ),
+          child: Text('Cart (${_cart.itemCount})'),
+        ),
+      ],
+    ),
+    body: _loading
+        ? const Center(child: CircularProgressIndicator())
+        : Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  for (final product in sampleCatalog)
+                    Card(
+                      child: ListTile(
+                        title: Text(product.name),
+                        subtitle: Text(shopPrice(product.priceCents)),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => Navigator.of(context).push<void>(
+                          MaterialPageRoute<void>(
+                            builder: (_) => ProductDetailPage(
+                              product: product,
+                              onAdd: () {
+                                _cart.add(product);
+                                _onCartChanged();
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+  );
+}

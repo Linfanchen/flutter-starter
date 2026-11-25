@@ -1,0 +1,13 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:starter_network/starter_network.dart';
+
+void main() {
+  test('Shared network client rejects URLs on another origin', () async {
+    final client = ApiClient(baseUrl: Uri.https('example.com', '/api'));
+    addTearDown(client.close);
+    await expectLater(
+      client.get('https://other.example.com/articles'),
+      throwsArgumentError,
+    );
+  });
+}

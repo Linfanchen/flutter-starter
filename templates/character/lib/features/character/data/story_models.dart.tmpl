@@ -1,0 +1,139 @@
+import '../domain/story.dart';
+
+/// Transport shape for one story choice.
+final class StoryChoiceDto {
+  const StoryChoiceDto({required this.label, required this.nextSceneId});
+
+  final String label;
+  final String nextSceneId;
+
+  factory StoryChoiceDto.fromJson(Object? value) {
+    if (value
+        case {
+          'label': final String label,
+          'nextSceneId': final String nextSceneId,
+        }
+        when label.isNotEmpty && nextSceneId.isNotEmpty) {
+      return StoryChoiceDto(label: label, nextSceneId: nextSceneId);
+    }
+    throw const FormatException('Invalid story choice.');
+  }
+
+  StoryChoice toDomain() => (label: label, nextSceneId: nextSceneId);
+}
+
+/// Transport shape for one narrative scene.
+final class StorySceneDto {
+  const StorySceneDto({required this.text, required this.choices});
+
+  final String text;
+  final List<StoryChoiceDto> choices;
+
+  factory StorySceneDto.fromJson(Object? value) {
+    if (value case {
+      'text': final String text,
+      'choices': final List<Object?> choices,
+    }) {
+      return StorySceneDto(
+        text: text,
+        choices: List.unmodifiable(choices.map(StoryChoiceDto.fromJson)),
+      );
+    }
+    throw const FormatException('Invalid story scene.');
+  }
+
+  StoryScene toDomain() => StoryScene(
+    text: text,
+    choices: List.unmodifiable(choices.map((choice) => choice.toDomain())),
+  );
+}
+
+/// Local entity shape for a complete story graph.
+final class StoryEntity {
+  const StoryEntity({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.openingSceneId,
+    required this.scenes,
+  });
+
+  final String id;
+  final String name;
+  final String description;
+  final String openingSceneId;
+  final Map<String, StorySceneDto> scenes;
+
+  factory StoryEntity.fromDomain(RoleStory story) => StoryEntity(
+    id: story.id,
+    name: story.name,
+    description: story.description,
+    openingSceneId: story.openingSceneId,
+    scenes: {
+      for (final entry in story.scenes.entries)
+        entry.key: StorySceneDto(
+          text: entry.value.text,
+          choices: [
+            for (final choice in entry.value.choices)
+              StoryChoiceDto(
+                label: choice.label,
+                nextSceneId: choice.nextSceneId,
+              ),
+          ],
+        ),
+    },
+  );
+
+  factory StoryEntity.fromJson(Object? value) {
+    if (value
+        case {
+          'id': final String id,
+          'name': final String name,
+          'description': final String description,
+          'openingSceneId': final String openingSceneId,
+          'scenes': final Map<String, Object?> scenes,
+        }
+        when id.isNotEmpty && name.isNotEmpty) {
+      return StoryEntity(
+        id: id,
+        name: name,
+        description: description,
+        openingSceneId: openingSceneId,
+        scenes: {
+          for (final entry in scenes.entries)
+            entry.key: StorySceneDto.fromJson(entry.value),
+        },
+      );
+    }
+    throw const FormatException('Invalid story.');
+  }
+
+  RoleStory toDomain() => RoleStory(
+    id: id,
+    name: name,
+    description: description,
+    openingSceneId: openingSceneId,
+    scenes: {
+      for (final entry in scenes.entries) entry.key: entry.value.toDomain(),
+    },
+  );
+}
+
+/// Maps transport data into the stable story domain.
+final class StoryMapper {
+  const StoryMapper._();
+
+  static RoleStory fromJson(Object? value) =>
+      StoryEntity.fromJson(value).toDomain();
+
+  static List<RoleStory> listFromJson(Object? value) {
+    if (value is! List<Object?>) {
+      throw const FormatException('Expected an array of stories.');
+    }
+    final stories = value.map(fromJson).toList(growable: false);
+    if (stories.map((story) => story.id).toSet().length != stories.length) {
+      throw const FormatException('Story IDs must be unique.');
+    }
+    return List.unmodifiable(stories);
+  }
+}

@@ -1,0 +1,107 @@
+import '{{material_import}}';
+
+import '../data/course_progress_store.dart';
+import '../domain/course.dart';
+
+/// Describes the lifecycle of a course catalog request.
+enum CourseCatalogStatus { initial, loading, success, failure }
+
+/// Owns catalog loading state and keeps request orchestration out of the page.
+final class CourseCatalogViewModel extends ChangeNotifier {
+  CourseCatalogViewModel(this._repository);
+
+  final CourseRepository _repository;
+  CourseCatalogStatus status = CourseCatalogStatus.initial;
+  List<Course> courses = const [];
+  Object? error;
+  bool _disposed = false;
+  bool _loading = false;
+
+  /// Loads the catalog. Repeated calls while loading share the active request.
+  Future<void> load() async {
+    if (_loading) return;
+    _loading = true;
+    error = null;
+    status = CourseCatalogStatus.loading;
+    _notify();
+    try {
+      courses = await _repository.listCourses();
+      status = CourseCatalogStatus.success;
+    } on Object catch (caught) {
+      error = caught;
+      status = CourseCatalogStatus.failure;
+    } finally {
+      _loading = false;
+      _notify();
+    }
+  }
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+}
+
+/// Owns completion state and persistence for one course detail screen.
+final class CourseDetailViewModel extends ChangeNotifier {
+  CourseDetailViewModel({required this.course, required this.progress});
+
+  final Course course;
+  final CourseProgressRepository progress;
+  Set<String>? completed;
+  bool isSaving = false;
+  bool saveFailed = false;
+  bool _disposed = false;
+
+  /// Restores progress without allowing a late callback to notify a disposed page.
+  Future<void> restore() async {
+    final restored = await progress.restore(course);
+    if (_disposed) return;
+    completed = restored;
+    notifyListeners();
+  }
+
+  /// Marks a lesson complete and persists one immutable snapshot at a time.
+  Future<void> markCompleted(String lessonId) async {
+    final current = completed;
+    if (current == null || current.contains(lessonId) || isSaving) return;
+    completed = {...current, lessonId};
+    saveFailed = false;
+    notifyListeners();
+    await _save();
+  }
+
+  /// Retries the last failed save without changing the visible completion state.
+  Future<void> retrySave() async {
+    if (completed == null || isSaving || !saveFailed) return;
+    await _save();
+  }
+
+  Future<void> _save() async {
+    final snapshot = Set<String>.from(completed!);
+    isSaving = true;
+    saveFailed = false;
+    notifyListeners();
+    try {
+      await progress.save(course, snapshot);
+    } on Object {
+      if (!_disposed) saveFailed = true;
+    } finally {
+      if (!_disposed) {
+        isSaving = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+}

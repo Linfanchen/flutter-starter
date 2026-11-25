@@ -1,0 +1,30 @@
+import 'package:flutter/widgets.dart';
+import 'package:starter_database/starter_database.dart';
+import 'package:starter_storage/starter_storage.dart';
+
+import '../features/character/data/story_storage.dart';
+import '../features/character/data/story_repositories.dart';
+import '../features/character/pages/character_list_page.dart';
+
+/// Connects the character catalog to the generated app's composition root.
+class TemplateHome extends StatefulWidget {
+  const TemplateHome({this.storage, this.database, super.key});
+
+  final StringStore? storage;
+  final StarterDatabase? database;
+
+  @override
+  State<TemplateHome> createState() => _TemplateHomeState();
+}
+
+class _TemplateHomeState extends State<TemplateHome> {
+  late final StoryProgressRepository _storage = widget.database == null
+      ? StoryStorage(widget.storage ?? PreferencesStringStore())
+      : DatabaseStoryProgressRepository(widget.database!);
+  late final StoryCatalogRepository _repository =
+      const SampleStoryCatalogRepository();
+
+  @override
+  Widget build(BuildContext context) =>
+      CharacterListPage(repository: _repository, storage: _storage);
+}

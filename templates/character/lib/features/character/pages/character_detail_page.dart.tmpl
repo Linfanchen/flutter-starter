@@ -1,0 +1,86 @@
+import '{{material_import}}';
+
+import '../data/story_storage.dart';
+import '../domain/story.dart';
+import 'story_page.dart';
+
+/// Introduces a character before the player starts a new playthrough.
+class CharacterDetailPage extends StatefulWidget {
+  const CharacterDetailPage({
+    required this.story,
+    required this.storage,
+    super.key,
+  });
+
+  final RoleStory story;
+  final StoryProgressRepository storage;
+
+  @override
+  State<CharacterDetailPage> createState() => _CharacterDetailPageState();
+}
+
+class _CharacterDetailPageState extends State<CharacterDetailPage> {
+  late var _progress = widget.storage.restore(widget.story);
+
+  Future<void> _openStory({StoryProgress? progress}) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => StoryPage(
+          story: widget.story,
+          storage: widget.storage,
+          initialSceneId: progress?.sceneId,
+          initialHistory: progress?.history,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    // Returning from a playthrough may have advanced the saved cursor.
+    final restored = widget.storage.restore(widget.story);
+    setState(() {
+      _progress = restored;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(widget.story.name)),
+    body: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            Text(
+              widget.story.description,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 24),
+            FutureBuilder<StoryProgress?>(
+              future: _progress,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final savedProgress = snapshot.data;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (savedProgress != null)
+                      FilledButton(
+                        onPressed: () => _openStory(progress: savedProgress),
+                        child: const Text('Continue story'),
+                      ),
+                    TextButton(
+                      onPressed: _openStory,
+                      child: const Text('Start story'),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}

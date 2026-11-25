@@ -1,0 +1,108 @@
+import '{{material_import}}';
+
+import '../data/story_repositories.dart';
+import '../data/story_storage.dart';
+import '../domain/story.dart';
+
+/// Loading states for the character catalog.
+enum CharacterCatalogStatus { initial, loading, success, failure }
+
+/// Coordinates catalog loading and retry without coupling the page to storage.
+final class CharacterCatalogViewModel extends ChangeNotifier {
+  CharacterCatalogViewModel(this._repository);
+
+  final StoryCatalogRepository _repository;
+  CharacterCatalogStatus status = CharacterCatalogStatus.initial;
+  List<RoleStory> stories = const [];
+  Object? error;
+  bool _loading = false;
+  bool _disposed = false;
+
+  Future<void> load() async {
+    if (_loading) return;
+    _loading = true;
+    status = CharacterCatalogStatus.loading;
+    error = null;
+    _notify();
+    try {
+      stories = await _repository.listStories();
+      status = CharacterCatalogStatus.success;
+    } on Object catch (caught) {
+      error = caught;
+      status = CharacterCatalogStatus.failure;
+    } finally {
+      _loading = false;
+      _notify();
+    }
+  }
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+}
+
+/// Owns one playthrough and serializes progress writes.
+final class StoryPlaythroughViewModel extends ChangeNotifier {
+  StoryPlaythroughViewModel({
+    required RoleStory story,
+    required this.progress,
+    String? initialSceneId,
+    List<String>? initialHistory,
+  }) : session = StorySession(
+         story,
+         sceneId: initialSceneId,
+         history: initialHistory,
+       );
+
+  final StoryProgressRepository progress;
+  StorySession session;
+  bool isSaving = false;
+  bool saveFailed = false;
+  bool _disposed = false;
+
+  /// Starts persistence for the current cursor without blocking first paint.
+  Future<void> initialize() => _save();
+
+  /// Applies one available choice and persists the new cursor once.
+  Future<void> choose(StoryChoice choice) async {
+    if (isSaving || session.scene.choices.isEmpty) return;
+    session.choose(choice);
+    saveFailed = false;
+    notifyListeners();
+    await _save();
+  }
+
+  /// Retries a failed cursor write without changing the story state.
+  Future<void> retrySave() async {
+    if (!saveFailed || isSaving) return;
+    await _save();
+  }
+
+  Future<void> _save() async {
+    isSaving = true;
+    saveFailed = false;
+    notifyListeners();
+    try {
+      await progress.save(session);
+    } on Object {
+      if (!_disposed) saveFailed = true;
+    } finally {
+      if (!_disposed) {
+        isSaving = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+}

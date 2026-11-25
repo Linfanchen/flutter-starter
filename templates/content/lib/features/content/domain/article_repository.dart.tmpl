@@ -1,0 +1,7 @@
+import 'article.dart';
+
+/// Supplies articles independently of how they are loaded.
+abstract interface class ArticleRepository {
+  /// Returns the available articles. An empty list represents no content.
+  Future<List<Article>> listArticles();
+}

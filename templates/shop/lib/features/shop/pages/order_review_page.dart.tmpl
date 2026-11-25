@@ -1,0 +1,45 @@
+import '{{material_import}}';
+
+import '../domain/demo_order.dart';
+import 'shop_price.dart';
+
+/// Reviews a demo order and returns true only after explicit confirmation.
+class OrderReviewPage extends StatelessWidget {
+  const OrderReviewPage({required this.order, super.key});
+
+  final DemoOrder order;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Review order')),
+    body: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 640),
+        child: ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            for (final line in order.lines)
+              ListTile(
+                title: Text(line.product.name),
+                subtitle: Text('Quantity: ${line.quantity}'),
+                trailing: Text(
+                  shopPrice(line.product.priceCents * line.quantity),
+                ),
+              ),
+            const Divider(),
+            ListTile(
+              title: const Text('Total'),
+              trailing: Text(shopPrice(order.totalCents)),
+            ),
+            const Text('This demo does not charge or ship items.'),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Place demo order'),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}

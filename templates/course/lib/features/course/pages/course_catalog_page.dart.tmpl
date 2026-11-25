@@ -1,0 +1,105 @@
+import 'dart:async';
+
+import '{{material_import}}';
+
+import '../../../shared/starter_ui.dart';
+import '../data/course_progress_store.dart';
+import '../domain/course.dart';
+import '../presentation/course_view_models.dart';
+import 'course_detail_page.dart';
+
+/// Lists courses and exposes loading, empty and recoverable error states.
+class CourseCatalogPage extends StatefulWidget {
+  const CourseCatalogPage({
+    required this.repository,
+    required this.progress,
+    this.viewModel,
+    super.key,
+  });
+
+  final CourseRepository repository;
+  final CourseProgressRepository progress;
+  final CourseCatalogViewModel? viewModel;
+
+  @override
+  State<CourseCatalogPage> createState() => _CourseCatalogPageState();
+}
+
+class _CourseCatalogPageState extends State<CourseCatalogPage> {
+  late final CourseCatalogViewModel _viewModel =
+      widget.viewModel ?? CourseCatalogViewModel(widget.repository);
+  late final bool _ownsViewModel = widget.viewModel == null;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_viewModel.load());
+  }
+
+  @override
+  void dispose() {
+    if (_ownsViewModel) _viewModel.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Courses')),
+    body: AnimatedBuilder(
+      animation: _viewModel,
+      builder: (context, _) {
+        switch (_viewModel.status) {
+          case CourseCatalogStatus.initial:
+          case CourseCatalogStatus.loading:
+            return const StarterLoading();
+          case CourseCatalogStatus.failure:
+            return StarterMessage(
+              'Could not load courses.',
+              onRetry: _viewModel.load,
+            );
+          case CourseCatalogStatus.success:
+            if (_viewModel.courses.isEmpty) {
+              return const StarterMessage('No courses available.');
+            }
+            return _CourseList(
+              courses: _viewModel.courses,
+              progress: widget.progress,
+            );
+        }
+      },
+    ),
+  );
+}
+
+class _CourseList extends StatelessWidget {
+  const _CourseList({required this.courses, required this.progress});
+
+  final List<Course> courses;
+  final CourseProgressRepository progress;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 720),
+      child: ListView(
+        padding: const EdgeInsets.all(StarterSpacing.medium),
+        children: [
+          for (final course in courses)
+            Card(
+              child: ListTile(
+                title: Text(course.title),
+                subtitle: Text(course.description),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        CourseDetailPage(course: course, progress: progress),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+}

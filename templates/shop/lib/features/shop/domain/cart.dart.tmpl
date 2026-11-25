@@ -1,0 +1,51 @@
+import 'product.dart';
+
+/// A product and its positive quantity in the cart.
+typedef CartLine = ({Product product, int quantity});
+
+/// In-memory cart that groups items by product ID.
+final class Cart {
+  Cart();
+
+  /// Builds a cart from lines already validated by the data source.
+  Cart.fromLines(Iterable<CartLine> lines) {
+    for (final line in lines) {
+      _lines[line.product.id] = line;
+    }
+  }
+
+  final _lines = <String, CartLine>{};
+
+  /// Live view of the current lines. Copy it when retaining a snapshot.
+  Iterable<CartLine> get lines => _lines.values;
+
+  int get itemCount => lines.fold(0, (total, line) => total + line.quantity);
+
+  int get totalCents => lines.fold(
+    0,
+    (total, line) => total + line.product.priceCents * line.quantity,
+  );
+
+  /// Removes every line after the demo order is confirmed.
+  void clear() => _lines.clear();
+
+  /// Adds one unit, retaining the stored product when its ID is already present.
+  void add(Product product) {
+    final existing = _lines[product.id];
+    _lines[product.id] = (
+      product: existing?.product ?? product,
+      quantity: (existing?.quantity ?? 0) + 1,
+    );
+  }
+
+  /// Removes one unit and drops the line when its last unit is removed.
+  void removeOne(String productId) {
+    final line = _lines[productId];
+    if (line == null) return;
+    if (line.quantity == 1) {
+      _lines.remove(productId);
+    } else {
+      _lines[productId] = (product: line.product, quantity: line.quantity - 1);
+    }
+  }
+}

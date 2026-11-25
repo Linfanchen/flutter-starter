@@ -1,0 +1,51 @@
+import '{{material_import}}';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:{{project_name}}/app/starter_app.dart';
+import 'package:{{project_name}}/features/content/content_page.dart';
+import 'package:{{project_name}}/features/content/data/remote_article_repository.dart';
+
+void main() {
+  testWidgets('Content template opens an article', (tester) async {
+    await tester.pumpWidget(const StarterApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Getting started'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Replace these articles with your content.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Content can retry after a failure and render an empty list', (
+    tester,
+  ) async {
+    var attempts = 0;
+    final repository = RemoteArticleRepository(() async {
+      if (++attempts == 1) throw const FormatException('Bad response');
+      return const <Object?>[];
+    });
+    await tester.pumpWidget(
+      MaterialApp(home: ContentPage(repository: repository)),
+    );
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.text('Could not load articles.'), findsOneWidget);
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(find.text('No articles yet.'), findsOneWidget);
+    expect(attempts, 2);
+  });
+
+  test('Remote article payload maps to domain fields', () async {
+    final repository = RemoteArticleRepository(
+      () async => [
+        {'id': 'hello', 'title': 'Hello', 'body': 'Article body'},
+      ],
+    );
+    final article = (await repository.listArticles()).single;
+    expect(article.id, 'hello');
+    expect(article.title, 'Hello');
+    expect(article.body, 'Article body');
+  });
+}

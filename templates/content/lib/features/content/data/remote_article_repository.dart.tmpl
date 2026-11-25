@@ -1,0 +1,33 @@
+import '../domain/article.dart';
+import '../domain/article_repository.dart';
+
+/// Validates a remote payload and maps it to content domain models.
+final class RemoteArticleRepository implements ArticleRepository {
+  const RemoteArticleRepository(this._fetch);
+
+  final Future<Object?> Function() _fetch;
+
+  @override
+  Future<List<Article>> listArticles() async {
+    final response = await _fetch();
+    if (response is! List<Object?>) {
+      throw const FormatException('Expected an array of articles.');
+    }
+    return List.unmodifiable(response.map(_fromJson));
+  }
+
+  static Article _fromJson(Object? value) {
+    if (value
+        case {
+          'id': final String id,
+          'title': final String title,
+          'body': final String body,
+        }
+        when id.trim().isNotEmpty && title.trim().isNotEmpty) {
+      return Article(id: id, title: title, body: body);
+    }
+    throw const FormatException(
+      'Invalid article. Expected id, title and body.',
+    );
+  }
+}

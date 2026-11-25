@@ -1,0 +1,35 @@
+import '{{material_import}}';
+
+import '../domain/course.dart';
+
+/// Presents a lesson and returns true only when the learner marks it complete.
+class LessonPage extends StatelessWidget {
+  const LessonPage({required this.lesson, required this.completed, super.key});
+
+  final Lesson lesson;
+  final bool completed;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(lesson.title)),
+    body: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            SelectableText(lesson.body),
+            const SizedBox(height: 24),
+            if (completed)
+              const Text('Lesson completed')
+            else
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Mark complete'),
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
+}

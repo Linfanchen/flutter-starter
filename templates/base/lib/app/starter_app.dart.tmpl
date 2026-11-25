@@ -1,0 +1,19 @@
+import '{{material_import}}';
+
+import '../shared/starter_ui.dart';
+import 'template_home.dart';
+
+/// Composes the shared themes with the home page selected by the template.
+class StarterApp extends StatelessWidget {
+  const StarterApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: '{{project_name}}',
+      theme: StarterTheme.build(brightness: Brightness.light),
+      darkTheme: StarterTheme.build(brightness: Brightness.dark),
+      home: const TemplateHome(),
+    );
+  }
+}

@@ -1,0 +1,56 @@
+import '{{material_import}}';
+
+import 'package:starter_config/starter_config.dart';
+import 'package:starter_network/starter_network.dart';
+
+import '../features/content/content_page.dart';
+import '../features/content/data/remote_article_repository.dart';
+import '../features/content/data/sample_article_repository.dart';
+import '../features/content/domain/article_repository.dart';
+import '../shared/starter_ui.dart';
+
+/// Selects the content data source and owns the remote client's lifecycle.
+class TemplateHome extends StatefulWidget {
+  const TemplateHome({this.apiUrl, super.key});
+
+  final String? apiUrl;
+
+  @override
+  State<TemplateHome> createState() => _TemplateHomeState();
+}
+
+class _TemplateHomeState extends State<TemplateHome> {
+  static const _apiUrl = String.fromEnvironment('CONTENT_API_BASE_URL');
+  ApiClient? _client;
+  late final ArticleRepository _repository = _configureRepository();
+
+  ArticleRepository _configureRepository() {
+    final config = AppConfig.parse(
+      apiKey: 'CONTENT_API_BASE_URL',
+      apiUrl: widget.apiUrl ?? _apiUrl,
+    );
+    if (config.useSampleData) return const SampleArticleRepository();
+    return RemoteArticleRepository(() async {
+      final client = _client ??= ApiClient(baseUrl: config.apiBaseUrl!);
+      return client.get('articles');
+    });
+  }
+
+  @override
+  void dispose() {
+    _client?.close();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    try {
+      return ContentPage(repository: _repository);
+    } on ConfigException catch (error) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Articles')),
+        body: StarterMessage(error.toString()),
+      );
+    }
+  }
+}

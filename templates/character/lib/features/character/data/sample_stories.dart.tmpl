@@ -1,0 +1,49 @@
+import '../domain/story.dart';
+
+/// Bundled stories. Each choice references a scene in the same story.
+const sampleStories = [
+  RoleStory(
+    id: 'cartographer',
+    name: 'The Cartographer',
+    description: 'Explore an island that vanished from every map.',
+    openingSceneId: 'landing',
+    scenes: {
+      'landing': StoryScene(
+        text: 'A lighthouse turns inland as your boat reaches the island.',
+        choices: [
+          (label: 'Follow the light', nextSceneId: 'lighthouse'),
+          (label: 'Search the beach', nextSceneId: 'beach'),
+        ],
+      ),
+      'lighthouse': StoryScene(
+        text: 'The keeper hands you a map that redraws itself at dawn.',
+      ),
+      'beach': StoryScene(
+        text: 'You uncover a brass compass that points to an uncharted bay.',
+      ),
+    },
+  ),
+  RoleStory(
+    id: 'archivist',
+    name: 'The Archivist',
+    description: 'Recover a missing story from the city archive.',
+    openingSceneId: 'archive',
+    scenes: {
+      'archive': StoryScene(
+        text:
+            'One book is missing from a shelf that has been locked for years.',
+        choices: [
+          (label: 'Read the ledger', nextSceneId: 'ledger'),
+          (label: 'Inspect the shelf', nextSceneId: 'shelf'),
+        ],
+      ),
+      'ledger': StoryScene(
+        text:
+            'The ledger records your own name as the last person to borrow it.',
+      ),
+      'shelf': StoryScene(
+        text: 'A note behind the shelf leads you to a room filled with lost stories.',
+      ),
+    },
+  ),
+];

@@ -1,0 +1,91 @@
+import '{{material_import}}';
+
+import '../domain/cart.dart';
+import '../domain/demo_order.dart';
+import 'order_complete_page.dart';
+import 'order_review_page.dart';
+import 'shop_price.dart';
+
+/// Edits the shared cart and starts the demo order review flow.
+class CartPage extends StatefulWidget {
+  const CartPage({required this.cart, required this.onCartChanged, super.key});
+
+  final Cart cart;
+  final VoidCallback onCartChanged;
+
+  @override
+  State<CartPage> createState() => _CartPageState();
+}
+
+class _CartPageState extends State<CartPage> {
+  Future<void> _reviewOrder() async {
+    // Review a snapshot so the receipt can outlive the mutable cart.
+    final order = DemoOrder(widget.cart.lines);
+    final confirmed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => OrderReviewPage(order: order)),
+    );
+    // Leaving review without confirmation preserves the active cart.
+    if (!mounted || confirmed != true) return;
+    widget.cart.clear();
+    widget.onCartChanged();
+    Navigator.of(context).pushReplacement<void, void>(
+      MaterialPageRoute<void>(builder: (_) => OrderCompletePage(order: order)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cart = widget.cart;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Your cart')),
+      body: cart.itemCount == 0
+          ? const Center(child: Text('Your cart is empty.'))
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    for (final line in cart.lines)
+                      ListTile(
+                        key: ValueKey(line.product.id),
+                        title: Text(line.product.name),
+                        subtitle: Text('Quantity: ${line.quantity}'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'Remove one ${line.product.name}',
+                              onPressed: () {
+                                setState(() => cart.removeOne(line.product.id));
+                                widget.onCartChanged();
+                              },
+                              icon: const Icon(Icons.remove),
+                            ),
+                            IconButton(
+                              tooltip: 'Add one ${line.product.name}',
+                              onPressed: () {
+                                setState(() => cart.add(line.product));
+                                widget.onCartChanged();
+                              },
+                              icon: const Icon(Icons.add),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const Divider(),
+                    ListTile(
+                      title: const Text('Subtotal'),
+                      trailing: Text(shopPrice(cart.totalCents)),
+                    ),
+                    FilledButton(
+                      onPressed: _reviewOrder,
+                      child: const Text('Review order'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+}

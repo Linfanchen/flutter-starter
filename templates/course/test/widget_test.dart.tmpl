@@ -1,0 +1,176 @@
+import '{{material_import}}';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:{{project_name}}/app/template_home.dart';
+import 'package:{{project_name}}/features/course/data/course_progress_store.dart';
+import 'package:{{project_name}}/features/course/data/course_repositories.dart';
+import 'package:{{project_name}}/features/course/domain/course.dart';
+import 'package:{{project_name}}/features/course/presentation/course_view_models.dart';
+import 'package:starter_database/starter_database.dart';
+import 'package:starter_storage/starter_storage.dart';
+
+void main() {
+  testWidgets('Invalid API configuration names the faulty setting', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: TemplateHome(apiUrl: 'not-a-url')),
+    );
+    expect(find.textContaining('COURSE_API_BASE_URL'), findsOneWidget);
+    expect(find.textContaining('not-a-url'), findsNothing);
+  });
+
+  testWidgets('Completes a lesson and resumes at the next one after restart', (
+    tester,
+  ) async {
+    final storage = MemoryStringStore({
+      'course.progress.flutter-ui': '{"version":1,"completed":["removed"]}',
+    });
+    final app = MaterialApp(home: TemplateHome(storage: storage));
+    await tester.pumpWidget(app);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Flutter UI basics'));
+    await tester.pumpAndSettle();
+    expect(find.text('0 of 2 lessons completed'), findsOneWidget);
+    await tester.tap(find.text('Start course'));
+    await tester.pumpAndSettle();
+    expect(find.text('Compose with widgets'), findsOneWidget);
+    await tester.tap(find.text('Mark complete'));
+    await tester.pumpAndSettle();
+    expect(find.text('1 of 2 lessons completed'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(app);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Flutter UI basics'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue learning'));
+    await tester.pumpAndSettle();
+    expect(find.text('Keep local state'), findsOneWidget);
+    await tester.tap(find.text('Mark complete'));
+    await tester.pumpAndSettle();
+    expect(find.text('2 of 2 lessons completed'), findsOneWidget);
+    expect(find.text('Continue learning'), findsNothing);
+  });
+
+  testWidgets('Retries the catalog after an invalid remote response', (
+    tester,
+  ) async {
+    var calls = 0;
+    final repository = RemoteCourseRepository(() async {
+      if (++calls == 1) return {'unexpected': true};
+      return [
+        {
+          'id': 'remote',
+          'title': 'Remote course',
+          'description': 'Loaded from an API fixture.',
+          'lessons': [
+            {'id': 'intro', 'title': 'Introduction', 'body': 'Lesson text.'},
+          ],
+        },
+      ];
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TemplateHome(
+          storage: MemoryStringStore(),
+          repository: repository,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Could not load courses.'), findsOneWidget);
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remote course'));
+    await tester.pumpAndSettle();
+    expect(find.text('Introduction'), findsOneWidget);
+    expect(calls, 2);
+  });
+
+  test(
+    'Saves completion only once when completion is submitted twice',
+    () async {
+      final storage = MemoryStringStore();
+      final course = const Course(
+        id: 'demo',
+        title: 'Demo',
+        description: 'Demo course.',
+        lessons: [Lesson(id: 'one', title: 'One', body: 'Text.')],
+      );
+      final viewModel = CourseDetailViewModel(
+        course: course,
+        progress: CourseProgressStore(storage),
+      );
+      await viewModel.restore();
+
+      await Future.wait([
+        viewModel.markCompleted('one'),
+        viewModel.markCompleted('one'),
+      ]);
+
+      expect(viewModel.completed, {'one'});
+      expect(await storage.read('course.progress.demo'), contains('"one"'));
+      viewModel.dispose();
+    },
+  );
+
+  test(
+    'Keeps a failed save retryable without losing optimistic state',
+    () async {
+      final storage = _RetryingStore();
+      final course = const Course(
+        id: 'demo',
+        title: 'Demo',
+        description: 'Demo course.',
+        lessons: [Lesson(id: 'one', title: 'One', body: 'Text.')],
+      );
+      final viewModel = CourseDetailViewModel(
+        course: course,
+        progress: CourseProgressStore(storage),
+      );
+      await viewModel.restore();
+      await viewModel.markCompleted('one');
+
+      expect(viewModel.saveFailed, isTrue);
+      expect(viewModel.completed, {'one'});
+      await viewModel.retrySave();
+      expect(viewModel.saveFailed, isFalse);
+      expect(storage.writes, 2);
+      viewModel.dispose();
+    },
+  );
+
+  test('Restores progress from the Drift-backed store', () async {
+    final database = StarterDatabase.memory();
+    final store = DatabaseCourseProgressStore(database);
+    final course = const Course(
+      id: 'demo',
+      title: 'Demo',
+      description: 'Demo course.',
+      lessons: [Lesson(id: 'one', title: 'One', body: 'Text.')],
+    );
+
+    await store.save(course, {'one', 'removed'});
+    expect(await store.restore(course), {'one'});
+    await database.close();
+  });
+}
+
+final class _RetryingStore implements StringStore {
+  int writes = 0;
+  String? value;
+
+  @override
+  Future<String?> read(String key) async => value;
+
+  @override
+  Future<void> write(String key, String value) async {
+    writes++;
+    if (writes == 1) throw StateError('Temporary storage failure.');
+    this.value = value;
+  }
+
+  @override
+  Future<void> remove(String key) async => value = null;
+}

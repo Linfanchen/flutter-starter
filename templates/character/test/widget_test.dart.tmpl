@@ -1,0 +1,93 @@
+import '{{material_import}}';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:{{project_name}}/app/template_home.dart';
+import 'package:{{project_name}}/features/character/data/sample_stories.dart';
+import 'package:{{project_name}}/features/character/data/story_storage.dart';
+import 'package:{{project_name}}/features/character/domain/story.dart';
+import 'package:starter_database/starter_database.dart';
+import 'package:starter_storage/starter_storage.dart';
+
+void main() {
+  testWidgets('A character story can branch and replay', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(home: TemplateHome(storage: MemoryStringStore())),
+    );
+    await tester.tap(find.text('The Cartographer'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Explore an island that vanished from every map.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Start story'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Follow the light'));
+    await tester.pumpAndSettle();
+    expect(find.text('Story ending'), findsOneWidget);
+    expect(
+      find.text('The keeper hands you a map that redraws itself at dawn.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Replay story'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Search the beach'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('You uncover a brass compass that points to an uncharted bay.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Choose another character'));
+    await tester.pumpAndSettle();
+    expect(find.text('The Archivist'), findsOneWidget);
+  });
+
+  testWidgets('Story restores a saved scene after restarting the app', (
+    tester,
+  ) async {
+    final storage = MemoryStringStore({
+      'character.progress.cartographer':
+          '{"version":1,"scene":"removed-scene"}',
+      'character.progress.archivist': '{"version":0,"scene":"ledger"}',
+    });
+    final app = MaterialApp(home: TemplateHome(storage: storage));
+    await tester.pumpWidget(app);
+    await tester.tap(find.text('The Archivist'));
+    await tester.pumpAndSettle();
+    expect(find.text('Continue story'), findsNothing);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('The Cartographer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue story'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Follow the light'));
+    await tester.pumpAndSettle();
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(app);
+    await tester.tap(find.text('The Cartographer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue story'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('The keeper hands you a map that redraws itself at dawn.'),
+      findsOneWidget,
+    );
+  });
+
+  test(
+    'Restores character progress from the Drift-backed repository',
+    () async {
+      final database = StarterDatabase.memory();
+      final repository = DatabaseStoryProgressRepository(database);
+      final story = sampleStories.first;
+      final session = StorySession(story, sceneId: 'lighthouse');
+
+      await repository.save(session);
+      expect((await repository.restore(story))?.sceneId, 'lighthouse');
+      await database.close();
+    },
+  );
+}

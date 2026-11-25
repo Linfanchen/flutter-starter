@@ -1,0 +1,71 @@
+import 'package:starter_network/starter_network.dart';
+
+import 'course_dtos.dart';
+import '../domain/course.dart';
+
+/// Bundled lessons for previewing the learning flow offline.
+final class SampleCourseRepository implements CourseRepository {
+  const SampleCourseRepository();
+
+  @override
+  Future<List<Course>> listCourses() async => const [
+    Course(
+      id: 'flutter-ui',
+      title: 'Flutter UI basics',
+      description: 'Build a small interface with widgets, layout and state.',
+      lessons: [
+        Lesson(
+          id: 'widgets',
+          title: 'Compose with widgets',
+          body:
+              'Start with a Text widget. Wrap it in Padding, then place it '
+              'alongside another widget in a Column. Change the padding '
+              'and observe which part of the layout moves.',
+        ),
+        Lesson(
+          id: 'state',
+          title: 'Keep local state',
+          body:
+              'Build a counter with a button. Store the count in your '
+              'State object and update it with setState when the button '
+              'is tapped. Keep the build method focused on rendering.',
+        ),
+      ],
+    ),
+    Course(
+      id: 'study-habits',
+      title: 'Build a study habit',
+      description: 'Plan smaller sessions and review what you remember.',
+      lessons: [
+        Lesson(
+          id: 'recall',
+          title: 'Practice active recall',
+          body:
+              'Close your notes and write three things you remember. '
+              'Compare your answers with the source, then turn one gap '
+              'into a question for tomorrow.',
+        ),
+      ],
+    ),
+  ];
+}
+
+/// Validates the API response before it reaches the course pages.
+final class RemoteCourseRepository implements CourseRepository {
+  const RemoteCourseRepository(this._fetch);
+
+  /// Creates the production repository with the shared JSON client.
+  ///
+  /// Keeping the endpoint here prevents application assembly from knowing the
+  /// transport path while the function constructor remains available for
+  /// deterministic tests.
+  RemoteCourseRepository.fromClient(ApiClient client)
+    : this(() => client.get('courses'));
+
+  final Future<Object?> Function() _fetch;
+
+  @override
+  Future<List<Course>> listCourses() async {
+    return CourseMapper.listFromJson(await _fetch());
+  }
+}

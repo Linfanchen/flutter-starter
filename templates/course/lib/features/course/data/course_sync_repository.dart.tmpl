@@ -1,0 +1,128 @@
+import 'dart:convert';
+
+import 'package:starter_database/starter_database.dart' hide SyncSnapshot;
+import 'package:starter_storage/starter_storage.dart';
+import 'package:starter_sync/starter_sync.dart';
+
+import 'course_dtos.dart';
+import 'course_repositories.dart';
+import '../domain/course.dart';
+
+/// Stores the feature-owned course catalog snapshot as versioned JSON.
+final class CourseCatalogCache implements SyncCache<Course> {
+  CourseCatalogCache(this._store);
+
+  static const _key = 'course.catalog.snapshot.v1';
+  final StringStore _store;
+
+  @override
+  Future<SyncSnapshot<Course>?> read() async {
+    final source = await _store.read(_key);
+    if (source == null) return null;
+    try {
+      return _decodeSnapshot(jsonDecode(source));
+    } on Object {
+      // A corrupt catalog is recoverable from the remote source.
+    }
+    return null;
+  }
+
+  @override
+  Future<void> write(SyncSnapshot<Course> snapshot) =>
+      _store.write(_key, jsonEncode(_encodeSnapshot(snapshot)));
+}
+
+/// Persists the same feature snapshot in the optional Drift database.
+final class DatabaseCourseCatalogCache implements SyncCache<Course> {
+  DatabaseCourseCatalogCache(this._database);
+
+  static const _scope = 'course.catalog';
+  final StarterDatabase _database;
+
+  @override
+  Future<SyncSnapshot<Course>?> read() async {
+    final record = await _database.readSyncSnapshot(_scope);
+    if (record == null) return null;
+    try {
+      final decoded = _decodeSnapshot(jsonDecode(record.payload));
+      if (decoded == null) return null;
+      return SyncSnapshot<Course>(
+        items: decoded.items,
+        cursor: record.cursor,
+        savedAt: record.savedAt,
+      );
+    } on Object {
+      // A corrupt catalog is recoverable from the remote source.
+      return null;
+    }
+  }
+
+  @override
+  Future<void> write(SyncSnapshot<Course> snapshot) =>
+      _database.writeSyncSnapshot(
+        scope: _scope,
+        payload: jsonEncode(_encodeSnapshot(snapshot)),
+        cursor: snapshot.cursor,
+        savedAt: snapshot.savedAt,
+      );
+}
+
+Map<String, Object?> _encodeSnapshot(SyncSnapshot<Course> snapshot) => {
+  'version': 1,
+  'savedAt': snapshot.savedAt.toIso8601String(),
+  'cursor': snapshot.cursor,
+  'items': [
+    for (final course in snapshot.items)
+      CourseEntity.fromDomain(course).toJson(),
+  ],
+};
+
+SyncSnapshot<Course>? _decodeSnapshot(Object? value) {
+  if (value case {
+    'version': 1,
+    'savedAt': final String savedAt,
+    'cursor': final String? cursor,
+    'items': final List<Object?> items,
+  }) {
+    final date = DateTime.tryParse(savedAt);
+    if (date == null) return null;
+    return SyncSnapshot<Course>(
+      items: [for (final item in items) CourseEntity.fromJson(item).toDomain()],
+      cursor: cursor,
+      savedAt: date,
+    );
+  }
+  return null;
+}
+
+/// Adapts the course remote repository to the generic synchronization layer.
+final class CourseRemoteSyncSource implements SyncRemote<Course> {
+  const CourseRemoteSyncSource(this._remote);
+
+  final RemoteCourseRepository _remote;
+
+  @override
+  Future<SyncPage<Course>> fetch({String? cursor}) async =>
+      SyncPage(items: await _remote.listCourses());
+}
+
+/// Provides a local-first catalog with remote refresh and offline fallback.
+final class SyncedCourseRepository implements CourseRepository {
+  SyncedCourseRepository({
+    required this.remote,
+    required StringStore storage,
+    StarterDatabase? database,
+  }) : _coordinator = SyncCoordinator<Course>(
+         cache: database == null
+             ? CourseCatalogCache(storage)
+             : DatabaseCourseCatalogCache(database),
+         remote: CourseRemoteSyncSource(remote),
+       );
+
+  final RemoteCourseRepository remote;
+  final SyncCoordinator<Course> _coordinator;
+
+  @override
+  Future<List<Course>> listCourses() async =>
+      (await _coordinator.synchronize()).items;
+}

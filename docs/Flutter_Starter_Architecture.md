@@ -2,7 +2,8 @@
 
 > **单仓库 · 多产品模板 · 独立 AI / IoT 模块 · 可复用 Packages · 自动化创建新 App**  
 > **正式架构设计、开源项目借鉴分析与落地实施规范**  
-> 版本：`2.0.0-design` ｜ 编制日期：2026-11-02 ｜ 状态：**架构基线 / 待编码实现**  
+> 版本：`2.0.0-design` ｜ 编制日期：2026-11-02 ｜ 状态：**V1 已有初版代码，待端到端验收。V2 为演进设计。**
+>
 > 适用对象：Flutter 独立开发者、技术负责人、AI 编程工具、后续产品工程团队  
 > 服务端边界：以 FastAPI 提供 HTTP/SSE/API 契约为主，不展开后端内部架构。
 
@@ -15,13 +16,17 @@
 只长期维护**一个 Starter Git 仓库**。未来创建工具 App、AI App、IoT App、内容 App、电商 App 或 AI+IoT 组合 App 时，能够：
 
 1. 拉取 Starter 仓库；
-2. 选择 `base`、`ai`、`iot`、`combined` 模板和目标平台；
+2. 选择模板和目标平台。V1 提供 `base`、`content`、`shop`、`character`、`course`，后续扩展 `ai`、`iot`、`combined`；
 3. 填入应用名称、组织标识、Bundle ID、品牌主题、API 地址；
 4. 生成**拥有自己 Git 历史、可独立运行和独立发布**的新 Flutter 项目；
 5. 开始开发该项目特有的 `features/`，不重复搭建认证、路由、网络、日志、UI、测试；
 6. 后续自行选择是否升级公共模块，而不是被 Starter 的变更强制影响。
 
-**核心定位：可生成应用的工程平台，而不是把所有产品都塞进一个大 App。**
+所有产品通过稳定的基座 API 复用通用能力。模板定义起步组合，生成后的产品可独立新增、替换或移除业务 Feature。
+
+### V1 的实施范围
+
+当前代码包含 `flutter-starter list`、`flutter-starter create`、五个 V1 模板，以及 `starter_network`、`starter_storage`、`starter_sync`、可选 `starter_database`、`starter_config` 和 `starter_auth` 公共包。生成器调用 Flutter 官方命令生成平台工程，将所需基座源码复制到各产品，并用相对路径引用。首个验收平台为 Web，实施顺序见第 16 节。
 
 ### 0.2 不可妥协的 12 条架构决策
 
@@ -54,7 +59,7 @@
 
 - **Starter Repo**：维护模板与共享能力的“母仓库”。
 - **Generated App**：通过 CLI 创建、独立维护的产品仓库。
-- **Template**：应用入口、平台工程、构建环境和默认页面的快照。
+- **Template**：应用入口、默认页面、依赖与路由组合的起步配置。平台工程由 `flutter create` 生成，模板可按所选能力补充原生配置。
 - **Package**：有明确公共 API 和可复用逻辑的 Dart/Flutter 包。
 - **Feature**：具体产品的业务边界，如聊天、商品列表、设备面板。
 - **Composition Root**：生成的 App 中集中装配依赖和路由的地方。
@@ -145,7 +150,7 @@
 4. E2E 测试**真正创建一个新项目并运行分析/构建**，不只测试字符串输出；
 5. 模板和 CLI 独立版本管理，发布时形成明确的兼容映射。
 
-**采用方案**：`tooling/starter_cli` + `tooling/bricks/app_base`、`app_ai`、`app_iot`、`feature_simple`、`feature_full`。**不照搬**其固定 BLoC 架构；模板按本工程 Riverpod 标准生成。参见 [Very Good CLI 工程规则](https://github.com/VeryGoodOpenSource/very_good_cli/blob/main/AGENTS.md) 与 [Templates](https://github.com/VeryGoodOpenSource/very_good_templates)。
+本仓库借鉴子命令组织、可替换的生成流程和生成产物测试。当前实现位于 `tooling/flutter_starter/`，使用官方 Flutter 工程加模板覆盖。模板复杂度提高后可评估 Mason。参见 [Very Good CLI 工程规则](https://github.com/VeryGoodOpenSource/very_good_cli/blob/main/AGENTS.md) 与 [Templates](https://github.com/VeryGoodOpenSource/very_good_templates)。
 
 ### 2.4 Immich：学习大型数据模型、同步和本地存储边界
 
@@ -163,7 +168,7 @@
 - 对网络与本地数据设置清晰的 SSOT、冲突规则、乐观更新状态；
 - 分层的静态分析、生成和测试规范。
 
-**Starter 决策**：选用 Drift 而非照搬 Isar，保留数据边界与同步方法；默认 AI/IoT 业务数据分别持有各自表和迁移。**风险**：AGPL，代码复用前需做许可证审查。
+**Starter 决策**：V1 提供不绑定数据库的 `starter_sync`，落地快照、游标分页、单飞刷新、Feature 合并规则、离线回退和本地修改队列；同时提供可选的 `starter_database` Drift 基座，维护数据库生命周期、同步元数据和序列化快照。Feature 自己负责 DTO、Entity、Mapper、进度规则、实体表和迁移；默认 AI/IoT 业务数据分别持有各自表和迁移。**风险**：AGPL，代码复用前需做许可证审查。
 
 ### 2.5 Lichess Mobile：学习实时状态、事件驱动与严格规范
 
@@ -356,7 +361,7 @@
 
 ```mermaid
 flowchart TB
-  CLI[Starter CLI + Mason 模板] --> APP[生成的独立 App / Composition Root]
+  CLI[flutter-starter + Flutter 官方工程 + 模板] --> APP[生成的独立 App / Composition Root]
   APP --> BASE[App Core / Design System]
   APP --> AI[可选 AI Module]
   APP --> IOT[可选 IoT Module]
@@ -401,9 +406,37 @@ flowchart TB
 - `iot_module -> app_shell`：禁止；
 - `core.common_utils -> 什么都放`：架构审查中拒绝。
 
+### 3.4 基座、业务模块与领域模型
+
+- **基座**以明确的公开入口提供通用网络、错误、日志、存储等能力。应用在组装入口注入环境地址、网络策略和可选会话能力。公开 API 保持兼容，内部实现可独立演进。新能力有跨产品复用需求时再提取为包。
+- **业务模块**拥有自己的模型、规则、Repository、状态和页面。集中在应用组装入口注册路由和依赖。通常模块之间没有直接依赖。有明确协作需求时，由应用层用公开契约、应用事件或显式 Bridge 协调，并检查依赖无环。AI 与 IoT 的直接依赖始终禁止。
+- **领域模型**用业务术语表达含义，例如内容模块拥有 `Article`，设备模块拥有 `Device`。Repository 或 Mapper 负责将接口 DTO 与本地记录转换为领域模型，ViewModel 再映射成 UI State。简单 Feature 可合并文件，复杂规则再抽取 `domain/` 和 UseCase。HTTP、持久化和页面类型留在各自边界内。
+- **共享数据**明确唯一权威来源和写入模块。跨模块传递公开 DTO、业务 ID 或明确的事件，接收方按自己的领域语义映射。具体产品的 API 路径、数据表和业务规则留在对应模块。
+
 ---
 
-## 4. 最终单仓库目录设计（母仓库）
+## 4. 母仓库目录
+
+当前 V1 的主要结构如下。业务模板各自叠加在 `templates/base/` 之上。
+
+```text
+flutter-starter/
+├── docs/
+├── packages/starter_network/
+├── packages/starter_storage/
+├── packages/starter_config/
+├── packages/starter_auth/
+├── templates/
+│   ├── base/
+│   ├── content/
+│   ├── shop/
+│   ├── character/
+│   └── course/
+├── tooling/flutter_starter/
+└── README.md
+```
+
+以下为长期结构，按实际能力逐步增加目录。V1 的 `starter_network` 对应下方的网络基座角色。
 
 ```text
 flutter-enterprise-starter/
@@ -416,10 +449,14 @@ flutter-enterprise-starter/
 ├── CHANGELOG.md
 ├── LICENSE
 ├── templates/                       # **模板原始资源，不是工作区 App**
-│   ├── base_app/
-│   ├── ai_app/
-│   ├── iot_app/
-│   ├── combined_app/
+│   ├── base/
+│   ├── content/
+│   ├── shop/
+│   ├── character/
+│   ├── course/
+│   ├── ai/
+│   ├── iot/
+│   ├── combined/
 │   └── flavors/
 ├── packages/
 │   ├── foundation/                  # 纯 Dart
@@ -436,17 +473,14 @@ flutter-enterprise-starter/
 │   ├── iot_example/
 │   └── combined_example/
 ├── tooling/
-│   ├── starter_cli/                 # 自研 Dart CLI
-│   │   ├── bin/starter.dart
+│   ├── flutter_starter/             # 自研 Dart CLI
+│   │   ├── bin/flutter_starter.dart
 │   │   ├── lib/src/commands/
 │   │   ├── lib/src/generator/
 │   │   ├── lib/src/validators/
 │   │   ├── lib/src/manifests/
 │   │   └── test/
-│   ├── bricks/
-│   │   ├── app_base/
-│   │   ├── app_ai/
-│   │   ├── app_iot/
+│   ├── bricks/                      # 可选的 Feature / Package 生成资源
 │   │   ├── feature_simple/
 │   │   ├── feature_full/
 │   │   └── module_package/
@@ -468,7 +502,7 @@ flutter-enterprise-starter/
     └── ios.yml
 ```
 
-**解释**：`templates/` 是 Mason 模板源，不应误当作已经可运行的 App；真正可运行的是 `examples/*` 与 CLI 生成的项目。建议 CLI 只发布必要的模板资源，不复制整个仓库历史。
+`templates/` 是 App 模板的唯一来源。可运行的验证对象是 CLI 生成的项目，以及后续按需维护的 `examples/*`。若引入 Mason，可用于 Feature / Package 生成。若未来切换 App 模板引擎，应一起迁移模板来源。
 
 ### 4.1 每个 Package 应具备的最小规范
 
@@ -491,6 +525,8 @@ packages/example_package/
 
 ## 5. Dart Workspaces、Melos、版本管理
 
+以下 Workspace 和 Melos 配置用于母仓库成员增多后的演进。V1 的 CLI 和生成项目分别管理依赖。
+
 ### 5.1 使用真实版本条件，而不是随意复制示例
 
 当前 Pub Workspaces 最低 Dart SDK 约束是 3.6；从 Dart 3.11 开始支持 workspace glob。为了让模板兼容性更明确：
@@ -511,7 +547,7 @@ environment:
 workspace:
   - packages/*
   - examples/*
-  - tooling/starter_cli
+  - tooling/flutter_starter
 dev_dependencies:
   melos: ^8.10.0 # 2026-11-02 参考版本；正式工程仍以 pubspec.lock 锁定
 melos:
@@ -570,54 +606,66 @@ dependencies:
 ---
 ## 6. 项目生成器（Starter CLI）正式设计
 
-### 6.1 目标用户旅程
+### 6.1 V1 用户旅程
 
 ```text
-首次准备：git clone Starter -> fvm install -> melos bootstrap
+安装 Flutter SDK → 在母仓库激活本地 CLI
                        ↓
-创建项目：starter create <project-name>
+flutter-starter create <project_name> --template <name>
                        ↓
-输入：模板 / 组织标识 / 平台 / 主题 / API / 存储 / 分发模式
+在临时目录调用官方 flutter create
                        ↓
-校验：名称 / 平台能力 / 许可 / 依赖冲突 / 输出路径
+复制公共包 → 应用 Base 模板 → 按需叠加选中的业务模板
                        ↓
-生成：Dart/Flutter 源码 + 平台工程 + 环境 + Test + CI + 文档
+flutter pub get → 可选 --verify（analyze / test）
                        ↓
-初始化：flutter pub get -> 代码生成 -> format -> analyze -> test
-                       ↓
-可选：git init / 首次提交
-                       ↓
-可直接 flutter run 的全新独立 App
+移至目标目录 → flutter run / flutter build
 ```
 
-### 6.2 CLI 命令规划（需要开发；不是现有命令）
+### 6.2 CLI 命令与演进
+
+V1 已实现下列命令的代码。安装方式见仓库 README。
 
 ```bash
-starter create my_app --template base --org com.example --platforms android,ios
-starter create ai_writer --template ai --org com.example --distribution standalone
-starter create smart_home --template iot --org com.example --platforms android,ios
-starter create assistant_hub --template combined --org com.example
-starter make feature device_history --style simple --tests
-starter make feature generation_history --style full --route /generation/history
-starter make page product_detail --feature product
-starter make repository product --feature product
-starter add module ai
-starter remove module iot
-starter doctor
-starter verify
-starter upgrade --plan
-starter list templates
-starter list modules
+flutter-starter list
+flutter-starter create my_app --template base --org com.example --platforms web --verify
+flutter-starter create reader_app --template content --platforms web --verify
+flutter-starter create my_shop --template shop --platforms web --verify
+flutter-starter create my_story --template character --platforms web --verify
+flutter-starter create my_course --template course --platforms web --verify
 ```
 
-`starter add/remove module` 对**构建时依赖与路由清单**进行安全修改，非热加载插件；它必须支持 dry-run、依赖检查和变更预览，不得破坏用户已修改的业务代码。V1 优先实现 `create/make/doctor/verify`，后续才实现安全的 add/remove/upgrade。
+后续命令按实际用例交付。
+
+```bash
+flutter-starter create ai_writer --template ai
+flutter-starter create smart_home --template iot
+flutter-starter create assistant_hub --template combined
+flutter-starter make feature device_history --style simple --tests
+flutter-starter make feature generation_history --style full --route /generation/history
+flutter-starter make page product_detail --feature product
+flutter-starter make repository product --feature product
+flutter-starter add module ai
+flutter-starter remove module iot
+flutter-starter doctor
+flutter-starter verify
+flutter-starter upgrade --plan
+flutter-starter list templates
+flutter-starter list modules
+```
+
+模块增删操作作用于构建时依赖与路由清单，应提供 dry-run、依赖检查和变更预览，并保留用户已修改的业务代码。
 
 ### 6.3 create 命令输入定义
+
+V1 接收 `name`、`--template`（默认 `base`）、`--org`（默认 `com.example`）、`--platforms`（默认 `web`）和 `--verify`。生成到当前目录下的项目名目录，已有同名路径时终止。V1 固定采用 Standalone，Git 仓库由产品开发者按需初始化。平台参数可用于生成相应目录，发布支持以真实构建结果为准。
+
+下表为长期参数设计，具体默认值以各版本 CLI 帮助为准。
 
 | 参数 | 必填 | 约束/默认值 |
 |---|---|---|
 | `name` | 是 | Dart Package 合法标识；App 显示名可另设 |
-| `--template` | 否 | `base/ai/iot/combined`，默认 `base` |
+| `--template` | 否 | 可用模板见第 6.8 节，默认 `base` |
 | `--org` | 是 | 反向域名，例如 `com.example` |
 | `--display-name` | 否 | 面向用户的应用名称 |
 | `--platforms` | 否 | `android,ios`；只生成可支持的平台 |
@@ -633,11 +681,11 @@ starter list modules
 
 **输入校验**：Windows 保留名称、大小写冲突、重复命名、目标路径已存在、包名非法、Bundle ID 非法、未支持平台、缺失 SDK、无权限写入、缺少可选模块所需的原生权限配置。
 
-### 6.4 CLI 内部结构
+### 6.4 CLI 内部结构（长期规划）
 
 ```text
-tooling/starter_cli/
-├── bin/starter.dart
+tooling/flutter_starter/
+├── bin/flutter_starter.dart
 ├── lib/src/
 │   ├── commands/
 │   │   ├── create_command.dart
@@ -663,7 +711,7 @@ tooling/starter_cli/
 
 依赖注入 `FileSystem`、`ProcessRunner`、`Logger`，使生成逻辑可单测；过程的输出目录先写入临时目录、验收后原子移动（或在失败时安全回滚），避免失败产生半成品。
 
-### 6.5 模板选择与模块依赖解析
+### 6.5 模板选择与模块依赖解析（长期规划）
 
 ```yaml
 # 模板 manifest 的设计稿，不是 Mason 标准字段
@@ -689,9 +737,9 @@ checks:
 
 **Resolver 算法**：模板 -> 选择模块 -> 扩展模块传递依赖 -> 检查循环 -> 检查模块禁用规则 -> 检查平台兼容 -> 计算需要复制的包 -> 生成/修改 `pubspec.yaml` -> 生成组合入口 -> 生成平台声明 -> 校验。
 
-### 6.6 Mason Brick 与 Hook 的职责
+### 6.6 可选的 Mason Brick 与 Hook
 
-`brick.yaml` 描述模板变量；`__brick__/` 保存生成文件；`hooks/pre_gen.dart` 用于参数派生及校验，`hooks/post_gen.dart` 用于经许可的、可控的后处理。
+V1 使用 `templates/` 下的 `.tmpl` 文件。基础模板始终先应用，所选模板提供增量。以下是引入 Mason 后可参考的 Brick 约定：`brick.yaml` 描述变量，`__brick__/` 保存生成文件，`hooks/pre_gen.dart` 用于参数派生及校验，`hooks/post_gen.dart` 用于可控的后处理。
 
 ```yaml
 # tooling/bricks/app_base/brick.yaml — 示例
@@ -714,48 +762,35 @@ vars:
 
 ### 6.7 生成后的独立 App 结构
 
+单应用产品采用标准 Flutter 根目录。以下以 `content` 为例。
+
 ```text
-my_ai_app/                     # 从 Starter 生成后与母仓库分离
-├── .fvmrc
-├── pubspec.yaml               # 该 App 的工作区根
+reader_app/
+├── web/                       # 根据 --platforms 生成
+├── pubspec.yaml
 ├── pubspec.lock
-├── README.md
-├── AGENTS.md
-├── apps/
-│   └── mobile_app/
-│       ├── android/
-│       ├── ios/
-│       ├── lib/
-│       │   ├── main_dev.dart
-│       │   ├── main_staging.dart
-│       │   ├── main_prod.dart
-│       │   ├── bootstrap/
-│       │   ├── app/
-│       │   ├── composition/
-│       │   └── features/      # 项目自有产品业务
-│       ├── l10n/
-│       ├── integration_test/
-│       └── test/
-├── packages/                   # standalone 复制的所需包
-│   ├── foundation/
-│   ├── network_core/
-│   ├── auth_core/
-│   ├── storage_core/
-│   ├── design_system/
-│   └── ai_module/
-└── .github/workflows/
+├── lib/
+│   ├── main.dart
+│   ├── app/                   # 应用入口、主题与依赖组装
+│   └── features/content/      # 产品业务
+├── packages/starter_network/  # Standalone 版本快照
+└── test/
 ```
 
-**关键验收**：在完全不同的文件路径、并且 Starter 源码目录不存在的环境中，运行 `flutter pub get`、`flutter analyze`、`flutter test`、`flutter build apk`，证明未留下母仓库绝对路径。
+产品复杂后可将组装单独放到 `lib/composition/`。同一产品仓库有多个应用时，可引入 `apps/` 与 Pub Workspace。Standalone 验收需在母仓库不可访问的环境中重新解析依赖，并执行目标平台构建。V1 首先执行 `flutter build web`。
 
 ### 6.8 真实产品模板清单
 
-| 模板 | 包含 | 不包含 | 开箱演示页 |
-|---|---|---|---|
-| `base` | Shell、Auth、Network、Storage、Theme、Home、Settings | AI/IoT 插件 | 登录、首页、账户、设置、异常状态 |
-| `ai` | Base + `ai_module` | BLE/MQTT 等 | 会话列表、聊天、任务进度、结构化草稿 |
-| `iot` | Base + `iot_module` | LLM SDK、Agent UI | 设备发现、连接、详情、遥测、命令 |
-| `combined` | Base + AI + IoT | 默认不包含两者桥接 | 两个独立 Tab，分别演示 AI 和 IoT |
+| 模板 | 阶段 | 组成与演示 |
+|---|---|---|
+| `base` | V1 | 应用入口、主题、首页与网络基座 |
+| `content` | V1 | 同一版基座，加使用本地示例数据的文章列表和详情 |
+| `shop` | V1 | 同一版基座，加商品列表、详情、购物车、订单核对和演示下单结果 |
+| `character` | V1 | 同一版基座，加角色列表、角色详情、分支剧情和可重玩的结局页 |
+| `course` | V1 | 同一版基座，加课程列表、课时目录、文字课时与本地学习进度，可接入远端目录 |
+| `ai` | 后续 | Base 加 `ai_module`，演示对话、流式任务和草稿 |
+| `iot` | 后续 | Base 加 `iot_module`，演示设备、连接、遥测和命令 |
+| `combined` | 后续 | Base 并列组装 AI 与 IoT，桥接按产品需求启用 |
 
 “开箱可运行”并不要求真实登录服务器或连接设备：模板须提供 **Mock Mode**，在没有 FastAPI/物理设备时也可以正常运行示例；真实服务需输入配置后再接入。
 
@@ -830,7 +865,7 @@ features/device_history/
 | Flutter/Dart | Stable + FVM | **固定并验证**实际 SDK，版本不硬编码进长期架构说明 |
 | Workspace | Dart Pub Workspaces | 单仓库统一解析，正确处理根 Lock |
 | 编排 | Melos | 包管理、脚本、变更控制 |
-| 代码生成 | Mason | 创建 App、Feature、Package |
+| 项目生成 | Flutter CLI + 模板覆盖 | V1 生成应用，后续可评估 Mason 生成 Feature 与 Package |
 | UI | Material 3 + Design System | 支持深色、无障碍、国际化 |
 | 状态 | Riverpod 3 | `Provider/Notifier/AsyncNotifier/StreamProvider` 等按需使用 |
 | 路由 | go_router | Shell、深链、登录重定向 |
@@ -912,6 +947,8 @@ final productListProvider = FutureProvider<List<Product>>((ref) {
 
 ### 8.6 Design System 标准
 
+V1 将主题构造、间距和通用加载、空状态、错误提示放在基础模板的 `lib/shared/starter_ui.dart`。产品在应用组装入口选择品牌色。独立 Design System 包按后续复用需要拆分。
+
 ```text
 design_system/lib/src/
 ├── tokens/           # colors, typography, spacing, radius, elevations, motion
@@ -926,6 +963,10 @@ design_system/lib/src/
 
 ### 8.7 网络与认证
 
+V1 的 `starter_network` 使用 `package:http`，提供 JSON GET/POST、可注入传输、结构化脱敏诊断和 SSE。SSE 基座负责流式传输、分帧、`Last-Event-ID`、`retry` 提示以及订阅取消。重连策略、服务端任务取消、事件 JSON 与业务模型转换由调用模块负责。下列认证与网络策略属于后续演进。
+
+`starter_config` 统一校验环境、API 地址和示例数据开关，`content` 与 `course` 各自组装 Repository。`starter_auth` 提供本地会话恢复、过期检查、退出清理与可注入的凭证接口，Base 使用内存演示。生产身份服务、平台安全存储与 Token 刷新由具体应用接入后验证。
+
 - Dio Factory 集中生成 RestClient，配置 baseUrl、timeouts、认证、取消和日志；
 - Token 通过 `SecureStorage` 保存，永不写入 debug log；
 - 同时出现多个 401，只执行一次 refresh（single-flight），其余请求等待同一个结果；
@@ -936,6 +977,8 @@ design_system/lib/src/
 - API 生成代码只放 Data 内；View 不接触后端原始 DTO。
 
 ### 8.8 数据与离线策略
+
+V1 的 `starter_storage` 提供轻量字符串读写接口、平台偏好适配及测试 Fake。商城、角色扮演和课程模板按需引用它，并由各自业务模块维护键名、版本和恢复规则。凭证、交易数据和需要事务保障的数据使用专门存储方案。
 
 - `LocalTable` 是持久化对象，`ApiDto` 是传输对象，`DomainModel` 表达业务含义，`UiState` 表达展示状态；
 - `Repository` 决定真相来源：云端优先、本地优先、离线快照或强一致按 Feature 明确；
@@ -1386,8 +1429,8 @@ Manifest 是 Starter CLI 的**自定义架构元数据**，不是 Dart/Pub 原�
 ```text
 quality.yml           format / analyze / unit / widget
 module-isolation.yml  package graph / imports / public API
-starter-cli.yml       CLI unit / Mason snapshot / invalid input
-base-smoke.yml        base Standalone generate + analyze + build
+starter-cli.yml       CLI unit / template snapshot / invalid input
+template-smoke.yml    V1 standalone template matrix / analyze / test / web build
 ai-smoke.yml          AI-only generate + tests + build
 iot-smoke.yml      IoT-only generate + tests + build
 combined-smoke.yml    AI+IoT build while verifying no direct cross deps
@@ -1398,13 +1441,14 @@ release.yml           tag / changelog / approval / publish
 
 ### 12.6 模板 E2E 的“真成功”定义
 
+- 在母仓库外生成所有 V1 模板。产物使用同一版本的网络基座，每个产物仅包含所选模板的业务模块。
 - 新工程目录可被移动到另一台机器路径下；
-- 把 Starter 母仓库移走后新工程仍能 `pub get`；
-- 生成的 App 有独立名称、包 ID、图标占位、环境配置；
+- 将生成项目复制到无法访问母仓库的环境，清除生成工具缓存后重新执行 `flutter pub get`；
+- 生成的 App 有独立项目名，所选平台使用传入的组织标识；
 - 未选择 AI 的工程，不含 AI 依赖、路由、资产；
 - 未选择 IoT 的工程，不含 BLE/MQTT 插件及平台权限；
-- Flutter `format/analyze/test` 均通过；
-- Android debug APK 通过；iOS 至少在 macOS 进行无签名编译验证；
+- `dart format` 检查、`flutter analyze` 和 `flutter test` 通过。CLI 的 `--verify` 仅运行后两项；
+- 首个验收平台执行 `flutter build web`，并使用 Chrome 验证各模板主流程。Android 与 iOS 进入支持范围时分别验证 debug APK 与 macOS 上的无签名构建；
 - CI 能打印明确、可读的失败步骤和恢复建议。
 
 ---
@@ -1482,68 +1526,53 @@ IoT 重点指标：发现耗时、连接成功率、重连率、ACK 率、命令
 
 每个破坏性变更写：`旧版本 -> 新版本`、变更原因、受影响文件/API、自动迁移能力、手工步骤、测试命令、回滚方法。数据库迁移另有不可逆风险评估。
 
-### 15.4 建议 ADR 清单
+### 15.4 ADR 编号
 
-- ADR-001 单 Git 仓库 / Monorepo；
-- ADR-002 Base/AI/IoT/Combined 多模板；
-- ADR-003 AI/IoT 完全平行；
-- ADR-004 Standalone 默认分发；
-- ADR-005 Shared Packages 采用受控版本；
-- ADR-006 Riverpod 统一状态管理；
-- ADR-007 Feature-First + MVVM + Repository；
-- ADR-008 Domain UseCase 按需；
-- ADR-009 SSE / Agent Event 类型化、恢复策略；
-- ADR-010 IoT Transport / Codec / Session 分离；
-- ADR-011 客户端不内置高权限模型密钥；
-- ADR-012 多端支持以能力验证而非理论承诺。
+第 0.2 节是 ADR-001 至 ADR-012 的唯一编号索引。拆分 `docs/adr/` 时沿用这些编号和决策主题。新决策使用新编号。
 
 ---
 
 ## 16. 分阶段开发顺序与可执行验收标准
 
-### Sprint 0：架构验证与仓库建立
+### V1 第一步：验证独立生成项目
 
-**交付**：空 Monorepo、FVM 固定、Dart Workspace、Melos、最小 Dart/Flutter Package、Lint、CI。
+用当前 `flutter-starter create` 在母仓库外生成各 V1 模板，按第 12.6 节执行依赖重解、分析、测试、Web 构建和 Chrome 冒烟。记录实际通过的 Flutter / Dart 版本，修复生成器问题后复跑模板矩阵。
 
-**验收**：`dart pub get`、`melos bootstrap`、简单单测；验证 Workspace 根锁文件和成员声明；明确 Flutter/Dart 兼容版本。
+### V1 第二步：验证基座和业务边界
 
-### Sprint 1：Base Core + 可运行例子
+为 `content` 补齐 `Article`、文章 Repository 与可替换数据源。默认使用 Fake，按配置接入远端时由数据层调用 `starter_network` 并将 DTO 映射成 `Article`。测试正常数据、空结果和错误，并确认 Base 产物不含文章模块。首次联网验证可用可控测试响应。
 
-**交付**：`foundation/network_core/auth_core/storage_core/design_system`、Base Shell、go_router、Riverpod 注入、Mock 登录、主题、多语言基础、错误 UI。
+### V1 第三步：固定验证流程并扩充基座
 
-**验收**：`base_example` 可以独立运行，登录 Fake 能模拟成功/过期/刷新/登出，至少一组 Repository/Provider/Widget 测试通过。
+把模板冒烟纳入 CI，固定经过验证的 SDK，并检查基座引用、模板裁剪和模块导入边界。随着产品需求加入通用认证、存储、Foundation 和设计系统。身份提供方、品牌配置和业务页面继续由应用组装。新增包带公开接口与测试，模板变更复跑生成产物。开发成员增多时再引入 Workspace、Melos 或可运行示例。
 
-### Sprint 2：Starter CLI + Base Template
-
-**交付**：`starter create`、Mason Brick、Standalone 模式、App ID/名称/平台替换、FVM/CI/AGENTS 生成、生成项目测试。
-
-**验收**：一条命令生成的 Base App 在另一目录独立通过 `flutter analyze/flutter test/flutter build apk`。
-
-### Sprint 3：AI 独立模块
+### 后续阶段：AI 独立模块
 
 **交付**：AI Chat 页面、SSE Parser、Agent Event、Run Manager、消息/Tool/Draft 状态、Mock Streaming、取消和快照恢复。
 
 **验收**：AI-only 项目不含 IoT 依赖；正常流式、重复事件、断线、草稿确认测试通过；不依赖真实 LLM 也能演示。
 
-### Sprint 4：IoT 独立模块
+### 后续阶段：IoT 独立模块
 
 **交付**：Device Transport/Codec/Session、Fake BLE、命令状态机、遥测 UI、连接/ACK/超时模拟、可选真实 BLE PoC。
 
 **验收**：IoT-only 项目不含 AI 依赖；Fake 设备完整流程通过；至少一台真实硬件完成连接/收发/恢复测试。
 
-### Sprint 5：生成器扩展与商业级交付
+### 后续阶段：生成器扩展与商业级交付
 
 **交付**：AI/IoT/Combined 模板、`make feature`、模块隔离扫描、CI 模板矩阵、独立项目迁移说明、License Audit。
 
-**验收**：四种模板全部生成并独立构建；没有相互 import；CI 每个 PR 检查并生成清晰报告。
+**验收**：所有已发布模板都能独立生成并构建。AI 与 IoT 的独立性由依赖和导入检查验证。CI 对每个 PR 生成检查报告。
 
-### Sprint 6：可选能力完善
+### 后续阶段：可选能力完善
 
 媒体生成、WebRTC 音频、嵌入式 HMI、插件化设备品牌、Shared Registry 发布、`upgrade --plan`、自动商店发布等根据真实产品需求逐步实施，**不要阻塞 Starter 基础版本交付**。
 
 ---
 
 ## 17. 终极验收清单（Definition of Done）
+
+以下为长期发布验收。V1 使用第 12.6 节与第 16 节定义的模板 Web 验收。AI、IoT、Shared 等项目随相应能力进入交付范围。
 
 | 分类 | 必须满足 | 如何证明 |
 |---|---|---|
@@ -1644,7 +1673,7 @@ IoT 重点指标：发现耗时、连接成功率、重连率、ACK 率、命令
 最终产品不是一个只有登录和首页的 Demo，而是由三块构成：
 
 1. **工程资产**：Foundation、Auth、Network、Storage、Design System、可选 AI / IoT Packages；
-2. **生成系统**：Base / AI / IoT / Combined 模板，Mason Bricks 与自定义 Starter CLI；
+2. **生成系统**：`flutter-starter` 调用官方 Flutter 命令，按模板安装基座与所选能力。V1 提供 Base / Content / Shop / Character，后续扩展 AI / IoT / Combined；
 3. **治理体系**：模块公开契约、版本控制、许可证核对、测试矩阵、CI、迁移手册与 AGENTS.md。
 
 ### 最终使用方式
@@ -1717,6 +1746,8 @@ IoT 重点指标：发现耗时、连接成功率、重连率、ACK 率、命令
 - Do not copy AGPL/GPL/non-commercial source into proprietary products without review.
 
 ## 7. Testing and Workflow
+- Write code comments in English. Add DartDoc for public APIs, including ownership, cancellation, failure, and format contracts when applicable.
+- Use inline comments for protocol rules, lifecycle boundaries, and design reasoning. Keep comments synchronized with code.
 - New code requires appropriate unit and Widget tests; protocol code requires fixtures.
 - Repositories and transports must be replaceable by Fakes.
 - Run format, analyze, tests, and architecture checks on every PR.
@@ -1727,7 +1758,7 @@ IoT 重点指标：发现耗时、连接成功率、重连率、ACK 率、命令
 
 ## 附录 B：母仓库与生成工程的依赖行为说明
 
-**极重要的细节**：母仓库采用单个 Pub Workspace 时，依赖解析会考虑该 Workspace 包含的**所有成员**；它不是通过“选择运行 AI Example”就在母仓库层面彻底不解析 IoT 的依赖。真正验证 AI-only 不包含 IoT 的位置是**生成出来的独立 App Workspace**：其成员列表与 `pubspec.yaml` 只列 Base + AI 所需的包。
+母仓库采用单个 Pub Workspace 时，依赖解析会考虑该 Workspace 的**所有成员**。运行 AI Example 仍会解析同一 Workspace 中的 IoT 依赖。应在**生成后的独立项目**验证 AI-only 的依赖隔离。单 App 检查 `pubspec.yaml` 和解析出的依赖图，多 App Workspace 还需检查成员列表。
 
 因此工程测试要分别进行：
 

@@ -1,0 +1,33 @@
+import '{{material_import}}';
+
+import '../domain/demo_order.dart';
+import 'shop_price.dart';
+
+/// Shows the confirmed demo order after the active cart has been cleared.
+class OrderCompletePage extends StatelessWidget {
+  const OrderCompletePage({required this.order, super.key});
+
+  final DemoOrder order;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Order complete')),
+    body: Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Demo order placed',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          Text('Order total: ${shopPrice(order.totalCents)}'),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Back to shop'),
+          ),
+        ],
+      ),
+    ),
+  );
+}

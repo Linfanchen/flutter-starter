@@ -1,0 +1,10 @@
+name: starter_network
+description: Shared JSON HTTP and SSE client for generated Flutter Starter apps.
+version: 0.2.0
+publish_to: none
+environment:
+  sdk: ^3.6.0
+dependencies:
+  http: ^1.6.0
+dev_dependencies:
+  test: ^1.26.0

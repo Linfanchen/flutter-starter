@@ -1,0 +1,13 @@
+import 'cart.dart';
+
+/// Immutable snapshot of the cart used by review and confirmation pages.
+final class DemoOrder {
+  DemoOrder(Iterable<CartLine> lines) : lines = List.unmodifiable(lines);
+
+  final List<CartLine> lines;
+
+  int get totalCents => lines.fold(
+    0,
+    (total, line) => total + line.product.priceCents * line.quantity,
+  );
+}

@@ -1,0 +1,51 @@
+import '{{material_import}}';
+
+/// Shared appearance defaults. Generated products can supply a brand color.
+abstract final class StarterTheme {
+  /// Creates a theme for the selected brightness and brand.
+  static ThemeData build({
+    required Brightness brightness,
+    Color brandColor = Colors.indigo,
+  }) => ThemeData(brightness: brightness, colorSchemeSeed: brandColor);
+}
+
+/// Spacing used by the starter's shared states and screen layouts.
+abstract final class StarterSpacing {
+  static const double small = 8;
+  static const double medium = 16;
+  static const double large = 24;
+}
+
+/// Centered indicator for a pending screen request.
+class StarterLoading extends StatelessWidget {
+  const StarterLoading({super.key});
+
+  @override
+  Widget build(BuildContext context) =>
+      const Center(child: CircularProgressIndicator(semanticsLabel: 'Loading'));
+}
+
+/// Presents an empty or failed state, optionally with one recovery action.
+class StarterMessage extends StatelessWidget {
+  const StarterMessage(this.message, {this.onRetry, super.key});
+
+  final String message;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(StarterSpacing.large),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(message, textAlign: TextAlign.center),
+          if (onRetry != null) ...[
+            const SizedBox(height: StarterSpacing.small),
+            TextButton(onPressed: onRetry, child: const Text('Retry')),
+          ],
+        ],
+      ),
+    ),
+  );
+}

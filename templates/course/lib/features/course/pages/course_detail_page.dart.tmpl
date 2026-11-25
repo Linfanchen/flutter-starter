@@ -1,0 +1,128 @@
+import 'dart:async';
+
+import '{{material_import}}';
+
+import '../data/course_progress_store.dart';
+import '../domain/course.dart';
+import '../presentation/course_view_models.dart';
+import 'lesson_page.dart';
+
+/// Shows the syllabus and resumes at the first incomplete lesson.
+class CourseDetailPage extends StatefulWidget {
+  const CourseDetailPage({
+    required this.course,
+    required this.progress,
+    this.viewModel,
+    super.key,
+  });
+
+  final Course course;
+  final CourseProgressRepository progress;
+  final CourseDetailViewModel? viewModel;
+
+  @override
+  State<CourseDetailPage> createState() => _CourseDetailPageState();
+}
+
+class _CourseDetailPageState extends State<CourseDetailPage> {
+  late final CourseDetailViewModel _viewModel =
+      widget.viewModel ??
+      CourseDetailViewModel(course: widget.course, progress: widget.progress);
+  late final bool _ownsViewModel = widget.viewModel == null;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_viewModel.restore());
+  }
+
+  @override
+  void dispose() {
+    if (_ownsViewModel) _viewModel.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openLesson(Lesson lesson) async {
+    final completed = _viewModel.completed;
+    if (completed == null) return;
+    final done = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => LessonPage(
+          lesson: lesson,
+          completed: completed.contains(lesson.id),
+        ),
+      ),
+    );
+    if (!mounted || done != true) return;
+    await _viewModel.markCompleted(lesson.id);
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(widget.course.title)),
+    body: AnimatedBuilder(
+      animation: _viewModel,
+      builder: (context, _) {
+        final completed = _viewModel.completed;
+        final remaining = widget.course.lessons.where(
+          (lesson) => !(completed?.contains(lesson.id) ?? false),
+        );
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                Text(widget.course.description),
+                const SizedBox(height: 16),
+                if (completed == null)
+                  const Center(child: CircularProgressIndicator())
+                else if (widget.course.lessons.isEmpty)
+                  const Text('No lessons available.')
+                else ...[
+                  Text(
+                    '${completed.length} of '
+                    '${widget.course.lessons.length} lessons completed',
+                  ),
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(
+                    value: completed.length / widget.course.lessons.length,
+                  ),
+                  if (_viewModel.saveFailed) ...[
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: _viewModel.retrySave,
+                      child: const Text('Retry saving progress'),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  if (remaining.isNotEmpty)
+                    FilledButton(
+                      onPressed: _viewModel.isSaving
+                          ? null
+                          : () => _openLesson(remaining.first),
+                      child: Text(
+                        completed.isEmpty
+                            ? 'Start course'
+                            : 'Continue learning',
+                      ),
+                    ),
+                  for (final lesson in widget.course.lessons)
+                    ListTile(
+                      title: Text(lesson.title),
+                      leading: Icon(
+                        completed.contains(lesson.id)
+                            ? Icons.check_circle_outline
+                            : Icons.article_outlined,
+                      ),
+                      onTap: () => _openLesson(lesson),
+                    ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
+}

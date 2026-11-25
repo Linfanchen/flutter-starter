@@ -1,0 +1,147 @@
+import '../domain/course.dart';
+
+/// Network representation of a lesson. It never crosses into presentation.
+final class LessonDto {
+  const LessonDto({required this.id, required this.title, required this.body});
+
+  final String id;
+  final String title;
+  final String body;
+
+  factory LessonDto.fromJson(Object? value) {
+    if (value
+        case {
+          'id': final String id,
+          'title': final String title,
+          'body': final String body,
+        }
+        when id.isNotEmpty && title.isNotEmpty) {
+      return LessonDto(id: id, title: title, body: body);
+    }
+    throw const FormatException('Invalid lesson.');
+  }
+
+  Lesson toDomain() => Lesson(id: id, title: title, body: body);
+}
+
+/// Network representation of a course and its nested lessons.
+final class CourseDto {
+  const CourseDto({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.lessons,
+  });
+
+  final String id;
+  final String title;
+  final String description;
+  final List<LessonDto> lessons;
+
+  factory CourseDto.fromJson(Object? value) {
+    if (value
+        case {
+          'id': final String id,
+          'title': final String title,
+          'description': final String description,
+          'lessons': final List<Object?> lessons,
+        }
+        when id.isNotEmpty && title.isNotEmpty) {
+      final parsed = lessons.map(LessonDto.fromJson).toList(growable: false);
+      if (parsed.map((lesson) => lesson.id).toSet().length != parsed.length) {
+        throw const FormatException(
+          'Lesson IDs must be unique within a course.',
+        );
+      }
+      return CourseDto(
+        id: id,
+        title: title,
+        description: description,
+        lessons: List.unmodifiable(parsed),
+      );
+    }
+    throw const FormatException('Invalid course.');
+  }
+
+  Course toDomain() => Course(
+    id: id,
+    title: title,
+    description: description,
+    lessons: List.unmodifiable(lessons.map((lesson) => lesson.toDomain())),
+  );
+}
+
+/// Converts transport DTOs into stable feature-owned domain models.
+final class CourseMapper {
+  const CourseMapper._();
+
+  static Course fromJson(Object? value) => CourseDto.fromJson(value).toDomain();
+
+  static List<Course> listFromJson(Object? value) {
+    if (value is! List<Object?>) {
+      throw const FormatException('Expected an array of courses.');
+    }
+    final courses = value.map(fromJson).toList(growable: false);
+    if (courses.map((course) => course.id).toSet().length != courses.length) {
+      throw const FormatException('Course IDs must be unique.');
+    }
+    return List.unmodifiable(courses);
+  }
+}
+
+/// Local database representation of a course aggregate.
+///
+/// The entity is deliberately independent from both transport DTOs and the
+/// domain model so storage migrations do not leak into feature behavior.
+final class CourseEntity {
+  const CourseEntity({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.lessons,
+  });
+
+  final String id;
+  final String title;
+  final String description;
+  final List<LessonDto> lessons;
+
+  factory CourseEntity.fromDomain(Course course) => CourseEntity(
+    id: course.id,
+    title: course.title,
+    description: course.description,
+    lessons: [
+      for (final lesson in course.lessons)
+        LessonDto(id: lesson.id, title: lesson.title, body: lesson.body),
+    ],
+  );
+
+  factory CourseEntity.fromJson(Object? value) =>
+      CourseDto.fromJson(value).toEntity();
+
+  Course toDomain() => Course(
+    id: id,
+    title: title,
+    description: description,
+    lessons: List.unmodifiable(lessons.map((lesson) => lesson.toDomain())),
+  );
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'title': title,
+    'description': description,
+    'lessons': [
+      for (final lesson in lessons)
+        {'id': lesson.id, 'title': lesson.title, 'body': lesson.body},
+    ],
+  };
+}
+
+extension on CourseDto {
+  CourseEntity toEntity() => CourseEntity(
+    id: id,
+    title: title,
+    description: description,
+    lessons: lessons,
+  );
+}

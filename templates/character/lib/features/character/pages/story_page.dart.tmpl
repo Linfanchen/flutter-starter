@@ -1,0 +1,112 @@
+import 'dart:async';
+
+import '{{material_import}}';
+
+import '../data/story_storage.dart';
+import '../domain/story.dart';
+import '../presentation/character_view_models.dart';
+import 'story_ending_page.dart';
+
+/// Owns a playthrough and renders the choices for the current scene.
+class StoryPage extends StatefulWidget {
+  const StoryPage({
+    required this.story,
+    required this.storage,
+    this.initialSceneId,
+    this.initialHistory,
+    super.key,
+  });
+
+  final RoleStory story;
+  final StoryProgressRepository storage;
+  final String? initialSceneId;
+  final List<String>? initialHistory;
+
+  @override
+  State<StoryPage> createState() => _StoryPageState();
+}
+
+class _StoryPageState extends State<StoryPage> {
+  late final StoryPlaythroughViewModel _viewModel = StoryPlaythroughViewModel(
+    story: widget.story,
+    progress: widget.storage,
+    initialSceneId: widget.initialSceneId,
+    initialHistory: widget.initialHistory,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_viewModel.initialize());
+  }
+
+  @override
+  void dispose() {
+    _viewModel.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openEnding() async {
+    final ending = _viewModel.session.scene;
+    final replay = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => StoryEndingPage(ending: ending)),
+    );
+    if (!mounted || replay != true) return;
+    _viewModel.session = StorySession(widget.story);
+    await _viewModel.initialize();
+  }
+
+  Future<void> _choose(StoryChoice choice) async {
+    await _viewModel.choose(choice);
+    if (!mounted || _viewModel.session.scene.choices.isNotEmpty) return;
+    await _openEnding();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(widget.story.name)),
+    body: AnimatedBuilder(
+      animation: _viewModel,
+      builder: (context, _) {
+        final scene = _viewModel.session.scene;
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 680),
+            child: ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                Text(
+                  scene.text,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                if (_viewModel.saveFailed) ...[
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: _viewModel.retrySave,
+                    child: const Text('Retry saving progress'),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                for (final choice in scene.choices)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: FilledButton(
+                      onPressed: _viewModel.isSaving
+                          ? null
+                          : () => _choose(choice),
+                      child: Text(choice.label),
+                    ),
+                  ),
+                if (scene.choices.isEmpty)
+                  FilledButton(
+                    onPressed: _openEnding,
+                    child: const Text('View ending'),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
+}

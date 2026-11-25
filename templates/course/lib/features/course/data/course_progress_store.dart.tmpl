@@ -1,0 +1,82 @@
+import 'dart:convert';
+
+import 'package:starter_database/starter_database.dart';
+import 'package:starter_storage/starter_storage.dart';
+
+import '../domain/course.dart';
+
+/// Persists completed lesson IDs per course independently of course content.
+abstract interface class CourseProgressRepository {
+  /// Restores only completion IDs that still exist in the current course.
+  Future<Set<String>> restore(Course course);
+
+  /// Saves the current completion snapshot for one course.
+  Future<void> save(Course course, Set<String> completed);
+}
+
+/// Lightweight preference-backed progress storage for simple products.
+final class CourseProgressStore implements CourseProgressRepository {
+  const CourseProgressStore(this._store);
+
+  final StringStore _store;
+
+  String _key(Course course) => 'course.progress.${course.id}';
+
+  @override
+  Future<Set<String>> restore(Course course) async {
+    try {
+      final source = await _store.read(_key(course));
+      if (source == null) return <String>{};
+      if (jsonDecode(source) case {'version': 1, 'completed': final List ids}) {
+        final knownIds = course.lessons.map((lesson) => lesson.id).toSet();
+        return ids.whereType<String>().where(knownIds.contains).toSet();
+      }
+    } on Exception {
+      // Unreadable progress should not prevent access to course material.
+    }
+    return <String>{};
+  }
+
+  @override
+  Future<void> save(Course course, Set<String> completed) => _store.write(
+    _key(course),
+    jsonEncode({'version': 1, 'completed': completed.toList()}),
+  );
+}
+
+/// Drift-backed progress storage for products that need transactional data.
+final class DatabaseCourseProgressStore implements CourseProgressRepository {
+  const DatabaseCourseProgressStore(this._database);
+
+  final StarterDatabase _database;
+
+  String _scope(Course course) => 'course.progress.${course.id}';
+
+  @override
+  Future<Set<String>> restore(Course course) async {
+    try {
+      final snapshot = await _database.readSyncSnapshot(_scope(course));
+      if (snapshot == null) return <String>{};
+      final decoded = jsonDecode(snapshot.payload);
+      if (decoded case {'version': 1, 'completed': final List ids}) {
+        final knownIds = course.lessons.map((lesson) => lesson.id).toSet();
+        return ids.whereType<String>().where(knownIds.contains).toSet();
+      }
+    } on Exception {
+      // Unreadable progress should not prevent access to course material.
+    }
+    return <String>{};
+  }
+
+  @override
+  Future<void> save(Course course, Set<String> completed) =>
+      _database.writeSyncSnapshot(
+        scope: _scope(course),
+        payload: jsonEncode({
+          'version': 1,
+          'completed': completed.toList()..sort(),
+        }),
+        cursor: null,
+        savedAt: DateTime.now().toUtc(),
+      );
+}

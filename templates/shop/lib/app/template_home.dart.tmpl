@@ -1,0 +1,14 @@
+import 'package:flutter/widgets.dart';
+import 'package:starter_storage/starter_storage.dart';
+
+import '../features/shop/pages/shop_catalog_page.dart';
+
+/// Connects the shop catalog to the generated app's composition root.
+class TemplateHome extends StatelessWidget {
+  const TemplateHome({this.storage, super.key});
+
+  final StringStore? storage;
+
+  @override
+  Widget build(BuildContext context) => ShopCatalogPage(storage: storage);
+}

@@ -1,0 +1,126 @@
+import 'dart:async';
+
+import '{{material_import}}';
+
+import 'package:starter_auth/starter_auth.dart';
+
+import '../shared/starter_ui.dart';
+
+/// Default home page for projects generated without a business overlay.
+class TemplateHome extends StatefulWidget {
+  const TemplateHome({super.key});
+
+  @override
+  State<TemplateHome> createState() => _TemplateHomeState();
+}
+
+class _TemplateHomeState extends State<TemplateHome> {
+  final _session = SessionManager(MemoryCredentialStore());
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Home')),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('{{project_name}}'),
+            const SizedBox(height: StarterSpacing.medium),
+            FilledButton(
+              onPressed: () => Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(
+                  builder: (_) => DemoSessionPage(manager: _session),
+                ),
+              ),
+              child: const Text('Open session demo'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Demonstrates the local session lifecycle without a real identity provider.
+class DemoSessionPage extends StatefulWidget {
+  const DemoSessionPage({required this.manager, super.key});
+
+  final SessionManager manager;
+
+  @override
+  State<DemoSessionPage> createState() => _DemoSessionPageState();
+}
+
+class _DemoSessionPageState extends State<DemoSessionPage> {
+  var _busy = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_restore());
+  }
+
+  Future<void> _restore() => _run(() async {
+    await widget.manager.restore();
+  });
+
+  Future<void> _run(Future<void> Function() operation) async {
+    // The caller starts an operation only while the page is mounted.
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await operation();
+    } on Exception {
+      if (mounted) _error = 'Could not update the demo session.';
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = widget.manager.session;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Session demo')),
+      body: _busy
+          ? const StarterLoading()
+          : Center(
+              child: Padding(
+                padding: const EdgeInsets.all(StarterSpacing.large),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_error != null) Text(_error!),
+                    Text(session == null ? 'Signed out' : 'Signed in as demo'),
+                    const SizedBox(height: StarterSpacing.medium),
+                    if (session == null)
+                      FilledButton(
+                        onPressed: () => _run(
+                          () => widget.manager.signIn(
+                            AuthSession(
+                              userId: 'demo',
+                              accessToken: 'local-demo-only',
+                              expiresAt: DateTime.now().add(
+                                const Duration(hours: 1),
+                              ),
+                            ),
+                          ),
+                        ),
+                        child: const Text('Sign in as demo'),
+                      )
+                    else
+                      FilledButton(
+                        onPressed: () => _run(widget.manager.signOut),
+                        child: const Text('Sign out'),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+}

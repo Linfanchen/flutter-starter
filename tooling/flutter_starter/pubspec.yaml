@@ -1,0 +1,12 @@
+name: flutter_starter
+description: Generate Flutter apps with the Flutter Starter templates.
+version: 0.1.0
+publish_to: none
+environment:
+  sdk: ^3.6.0
+dependencies:
+  yaml_edit: ^2.2.4
+dev_dependencies:
+  test: ^1.26.0
+executables:
+  flutter-starter: flutter_starter

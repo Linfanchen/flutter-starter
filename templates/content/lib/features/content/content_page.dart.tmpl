@@ -1,0 +1,83 @@
+import '{{material_import}}';
+
+import '../../shared/starter_ui.dart';
+import 'domain/article.dart';
+import 'domain/article_repository.dart';
+
+/// Displays articles from the repository supplied by app composition.
+class ContentPage extends StatefulWidget {
+  const ContentPage({required this.repository, super.key});
+
+  final ArticleRepository repository;
+
+  @override
+  State<ContentPage> createState() => _ContentPageState();
+}
+
+class _ContentPageState extends State<ContentPage> {
+  // Retain the current load across rebuilds so rendering cannot repeat a request.
+  late Future<List<Article>> _articles;
+
+  @override
+  void initState() {
+    super.initState();
+    _articles = widget.repository.listArticles();
+  }
+
+  @override
+  void didUpdateWidget(covariant ContentPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.repository != oldWidget.repository) {
+      _articles = widget.repository.listArticles();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Articles')),
+      body: FutureBuilder<List<Article>>(
+        future: _articles,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const StarterLoading();
+          }
+          if (snapshot.hasError) {
+            return StarterMessage(
+              'Could not load articles.',
+              onRetry: () => setState(() {
+                _articles = widget.repository.listArticles();
+              }),
+            );
+          }
+          final articles = snapshot.requireData;
+          if (articles.isEmpty) {
+            return const StarterMessage('No articles yet.');
+          }
+          return ListView.builder(
+            itemCount: articles.length,
+            itemBuilder: (context, index) {
+              final article = articles[index];
+              return ListTile(
+                key: ValueKey(article.id),
+                title: Text(article.title),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (context) => Scaffold(
+                      appBar: AppBar(title: Text(article.title)),
+                      body: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(article.body),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}

@@ -1,0 +1,106 @@
+import 'dart:async';
+
+import '{{material_import}}';
+
+import '../../../shared/starter_ui.dart';
+import '../data/story_repositories.dart';
+import '../data/story_storage.dart';
+import '../domain/story.dart';
+import '../presentation/character_view_models.dart';
+import 'character_detail_page.dart';
+
+/// Lists playable characters and exposes catalog loading states.
+class CharacterListPage extends StatefulWidget {
+  const CharacterListPage({
+    required this.repository,
+    required this.storage,
+    this.viewModel,
+    super.key,
+  });
+
+  final StoryCatalogRepository repository;
+  final StoryProgressRepository storage;
+  final CharacterCatalogViewModel? viewModel;
+
+  @override
+  State<CharacterListPage> createState() => _CharacterListPageState();
+}
+
+class _CharacterListPageState extends State<CharacterListPage> {
+  late final CharacterCatalogViewModel _viewModel =
+      widget.viewModel ?? CharacterCatalogViewModel(widget.repository);
+  late final bool _ownsViewModel = widget.viewModel == null;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_viewModel.load());
+  }
+
+  @override
+  void dispose() {
+    if (_ownsViewModel) _viewModel.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Choose a character')),
+    body: AnimatedBuilder(
+      animation: _viewModel,
+      builder: (context, _) {
+        switch (_viewModel.status) {
+          case CharacterCatalogStatus.initial:
+          case CharacterCatalogStatus.loading:
+            return const StarterLoading();
+          case CharacterCatalogStatus.failure:
+            return StarterMessage(
+              'Could not load characters.',
+              onRetry: _viewModel.load,
+            );
+          case CharacterCatalogStatus.success:
+            if (_viewModel.stories.isEmpty) {
+              return const StarterMessage('No characters available.');
+            }
+            return _CharacterList(
+              stories: _viewModel.stories,
+              storage: widget.storage,
+            );
+        }
+      },
+    ),
+  );
+}
+
+class _CharacterList extends StatelessWidget {
+  const _CharacterList({required this.stories, required this.storage});
+
+  final List<RoleStory> stories;
+  final StoryProgressRepository storage;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 680),
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          for (final story in stories)
+            Card(
+              child: ListTile(
+                title: Text(story.name),
+                subtitle: Text(story.description),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        CharacterDetailPage(story: story, storage: storage),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+}

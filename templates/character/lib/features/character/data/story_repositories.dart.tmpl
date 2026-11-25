@@ -1,0 +1,31 @@
+import '../domain/story.dart';
+import 'sample_stories.dart';
+import 'story_models.dart';
+
+/// Loads the playable story catalog independently of its source.
+abstract interface class StoryCatalogRepository {
+  Future<List<RoleStory>> listStories();
+}
+
+/// Bundled catalog used by previews and products without a backend.
+final class SampleStoryCatalogRepository implements StoryCatalogRepository {
+  const SampleStoryCatalogRepository();
+
+  @override
+  Future<List<RoleStory>> listStories() async =>
+      List.unmodifiable(sampleStories);
+}
+
+/// Validates a remote story response before it reaches the UI.
+final class RemoteStoryCatalogRepository implements StoryCatalogRepository {
+  const RemoteStoryCatalogRepository(this._fetch);
+
+  final Future<Object?> Function() _fetch;
+
+  @override
+  Future<List<RoleStory>> listStories() async {
+    final payload = await _fetch();
+    // The DTO mapper owns validation and keeps transport objects out of pages.
+    return StoryMapper.listFromJson(payload);
+  }
+}

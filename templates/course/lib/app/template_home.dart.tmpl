@@ -1,0 +1,75 @@
+import '{{material_import}}';
+
+import 'package:starter_config/starter_config.dart';
+import 'package:starter_database/starter_database.dart';
+import 'package:starter_network/starter_network.dart';
+import 'package:starter_storage/starter_storage.dart';
+
+import '../features/course/data/course_progress_store.dart';
+import '../features/course/data/course_repositories.dart';
+import '../features/course/data/course_sync_repository.dart';
+import '../features/course/domain/course.dart';
+import '../features/course/pages/course_catalog_page.dart';
+import '../shared/starter_ui.dart';
+
+/// Selects the catalog source and owns the network and storage adapters.
+class TemplateHome extends StatefulWidget {
+  const TemplateHome({
+    this.storage,
+    this.database,
+    this.repository,
+    this.apiUrl,
+    super.key,
+  });
+
+  final StringStore? storage;
+  final StarterDatabase? database;
+  final CourseRepository? repository;
+  final String? apiUrl;
+
+  @override
+  State<TemplateHome> createState() => _TemplateHomeState();
+}
+
+class _TemplateHomeState extends State<TemplateHome> {
+  static const _apiUrl = String.fromEnvironment('COURSE_API_BASE_URL');
+  ApiClient? _client;
+  late final StringStore _storage = widget.storage ?? PreferencesStringStore();
+  late final CourseProgressRepository _progress = widget.database == null
+      ? CourseProgressStore(_storage)
+      : DatabaseCourseProgressStore(widget.database!);
+  late final CourseRepository _repository =
+      widget.repository ?? _configureRepository();
+
+  CourseRepository _configureRepository() {
+    final config = AppConfig.parse(
+      apiKey: 'COURSE_API_BASE_URL',
+      apiUrl: widget.apiUrl ?? _apiUrl,
+    );
+    if (config.useSampleData) return const SampleCourseRepository();
+    final client = _client ??= ApiClient(baseUrl: config.apiBaseUrl!);
+    return SyncedCourseRepository(
+      remote: RemoteCourseRepository.fromClient(client),
+      storage: _storage,
+      database: widget.database,
+    );
+  }
+
+  @override
+  void dispose() {
+    _client?.close();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    try {
+      return CourseCatalogPage(repository: _repository, progress: _progress);
+    } on ConfigException catch (error) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Courses')),
+        body: StarterMessage(error.toString()),
+      );
+    }
+  }
+}

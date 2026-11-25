@@ -1,0 +1,82 @@
+/// A visible choice and the ID of the scene it opens.
+typedef StoryChoice = ({String label, String nextSceneId});
+
+/// One narrative scene. A scene without choices is an ending.
+final class StoryScene {
+  const StoryScene({required this.text, this.choices = const []});
+
+  final String text;
+  final List<StoryChoice> choices;
+}
+
+/// A character's story graph, keyed by scene ID.
+final class RoleStory {
+  const RoleStory({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.openingSceneId,
+    required this.scenes,
+  });
+
+  /// A stable identifier used by persisted progress.
+  final String id;
+  final String name;
+  final String description;
+  final String openingSceneId;
+  final Map<String, StoryScene> scenes;
+}
+
+/// Tracks the current scene for one playthrough.
+final class StoryProgress {
+  const StoryProgress({required this.sceneId, this.history = const []});
+
+  final String sceneId;
+  final List<String> history;
+}
+
+/// Tracks the current scene for one playthrough.
+final class StorySession {
+  StorySession(this.story, {String? sceneId, List<String>? history})
+    : _sceneId = _resolveScene(story, sceneId),
+      _history = _buildHistory(story, sceneId, history);
+
+  final RoleStory story;
+  String _sceneId;
+  final List<String> _history;
+
+  /// Stable cursor for saving the current scene.
+  String get sceneId => _sceneId;
+
+  /// The ordered scene IDs visited during this playthrough.
+  List<String> get history => List.unmodifiable(_history);
+
+  StoryScene get scene => story.scenes[_sceneId]!;
+
+  /// Advances using a choice from the current scene.
+  void choose(StoryChoice choice) {
+    if (!scene.choices.contains(choice)) {
+      throw ArgumentError.value(choice, 'choice', 'Choice is unavailable.');
+    }
+    _sceneId = choice.nextSceneId;
+    _history.add(_sceneId);
+  }
+}
+
+String _resolveScene(RoleStory story, String? sceneId) =>
+    sceneId != null && story.scenes.containsKey(sceneId)
+    ? sceneId
+    : story.openingSceneId;
+
+List<String> _buildHistory(
+  RoleStory story,
+  String? sceneId,
+  List<String>? history,
+) {
+  final resolved = _resolveScene(story, sceneId);
+  final valid = (history ?? const <String>[])
+      .where(story.scenes.containsKey)
+      .toList();
+  if (valid.isEmpty || valid.last != resolved) valid.add(resolved);
+  return valid;
+}

@@ -1,0 +1,36 @@
+import '{{material_import}}';
+
+import '../domain/story.dart';
+
+/// Displays a terminal scene and offers a replay or a return to character selection.
+class StoryEndingPage extends StatelessWidget {
+  const StoryEndingPage({required this.ending, super.key});
+
+  final StoryScene ending;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Story ending')),
+    body: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            Text(ending.text, style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Replay story'),
+            ),
+            TextButton(
+              onPressed: () =>
+                  Navigator.of(context).popUntil((route) => route.isFirst),
+              child: const Text('Choose another character'),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
