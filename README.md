@@ -56,6 +56,7 @@ flutter-starter/
 ├── packages/starter_network/  # 模板共用的 JSON HTTP / SSE 客户端
 ├── packages/starter_storage/  # 按业务模板需要安装的本地键值存储
 ├── packages/starter_sync/     # 本地优先同步、游标和离线回退
+├── packages/starter_realtime/ # 可选实时事件、Reducer 和重连状态机
 ├── packages/starter_database/ # 可选 Drift 数据库与迁移入口
 ├── packages/starter_config/   # 环境、API 地址和示例数据开关校验
 ├── packages/starter_auth/     # 会话生命周期与凭证存储接口
@@ -82,6 +83,8 @@ SSE 用 `client.openSse('events', lastEventId: lastSeenId)` 订阅。返回 `Sse
 `starter_sync` 提供不绑定数据库的同步协调：先读取 Feature 自己的本地快照，再单飞刷新远端；支持游标分页、Feature 自定义合并规则、离线回退和本地修改队列。刷新失败时有快照则返回可用的过期数据，并保留错误用于诊断。课程模板已接入 DTO → Entity → Mapper → Domain、版本化课程目录快照和离线回退。大量查询、分页和复杂迁移出现后，再为具体产品选择 Drift 等数据库。
 
 `starter_database` 是 Drift 基座，只维护同步元数据、快照存储和数据库生命周期；课程模板已声明并可通过 `TemplateHome(database: ...)` 注入它，默认仍使用 `StringStore`，因此不会在启动时强制打开 SQLite。产品自己的表、Entity 和迁移应放在产品或 Feature 数据库中。
+
+`starter_realtime` 是可选实时基座，负责事件信封、连接状态、Reducer、事件 ID 去重、序列重排、事件日志持久化/回放、最后事件恢复和有界重连。`RealtimeSession` 将业务状态与连接生命周期分离。SSE/WebSocket 的具体 Transport 由产品注入，业务事件解释和状态模型仍归 Feature 所有。
 
 使用存储基座的 `shop`、`character` 和 `course` 模板需要 Flutter 3.41 或更新版本。调试 Web 恢复行为时，使用固定的 `--web-port`，让重启前后访问同一来源。
 

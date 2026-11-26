@@ -26,7 +26,7 @@
 
 ### V1 的实施范围
 
-当前代码包含 `flutter-starter list`、`flutter-starter create`、五个 V1 模板，以及 `starter_network`、`starter_storage`、`starter_sync`、可选 `starter_database`、`starter_config` 和 `starter_auth` 公共包。生成器调用 Flutter 官方命令生成平台工程，将所需基座源码复制到各产品，并用相对路径引用。首个验收平台为 Web，实施顺序见第 16 节。
+当前代码包含 `flutter-starter list`、`flutter-starter create`、五个 V1 模板，以及 `starter_network`、`starter_storage`、`starter_sync`、可选 `starter_realtime`、`starter_database`、`starter_config` 和 `starter_auth` 公共包。生成器调用 Flutter 官方命令生成平台工程，将所需基座源码复制到各产品，并用相对路径引用。首个验收平台为 Web，实施顺序见第 16 节。
 
 ### 0.2 不可妥协的 12 条架构决策
 
@@ -184,7 +184,7 @@
 - 分层 Fake、Lint、持续构建、AI 编码规则；
 - 高交互列表与实时局部渲染。
 
-**Starter 决策**：AI Run 及 Device Session 均采用显式状态机，但保持两个模块各自独立；**不**搬棋类专用模型与逻辑，GPL 代码不可直接当闭源模板。
+**Starter 决策**：AI Run 及 Device Session 均采用显式状态机，但保持两个模块各自独立；通用实时能力已落在可选 `starter_realtime`，包含事件 Reducer、连接状态、序列重排、事件日志回放和业务 Session 分离；**不**搬棋类专用模型与逻辑，GPL 代码不可直接当闭源模板。
 
 ### 2.6 Flutter AI Toolkit：学习可插拔聊天 UI
 

@@ -1,0 +1,13 @@
+name: starter_ai
+description: Optional provider-agnostic AI chat domain, streaming state and UI primitives.
+version: 0.1.0
+publish_to: none
+environment:
+  sdk: ^3.11.0
+  flutter: ">=3.41.0"
+dependencies:
+  flutter:
+    sdk: flutter
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
